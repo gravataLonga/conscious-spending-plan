@@ -12,12 +12,12 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-[#f7f2e7] text-slate-900">
+    <body class="min-h-screen bg-slate-100 text-slate-900">
         <div class="relative overflow-hidden">
             <div aria-hidden="true" class="pointer-events-none absolute inset-0">
-                <div class="absolute -top-32 right-[-10%] h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(251,146,60,0.35)_0%,rgba(251,146,60,0)_70%)] blur-2xl"></div>
-                <div class="absolute left-[-15%] top-40 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(20,184,166,0.25)_0%,rgba(20,184,166,0)_72%)] blur-2xl"></div>
-                <div class="absolute bottom-[-18%] right-10 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(250,204,21,0.25)_0%,rgba(250,204,21,0)_70%)] blur-2xl"></div>
+                <div class="absolute -top-32 right-[-10%] h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(59,130,246,0.18)_0%,rgba(59,130,246,0)_70%)] blur-2xl"></div>
+                <div class="absolute left-[-15%] top-40 h-80 w-80 rounded-xl bg-[radial-gradient(circle,rgba(15,23,42,0.14)_0%,rgba(15,23,42,0)_72%)] blur-2xl"></div>
+                <div class="absolute bottom-[-18%] right-10 h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(148,163,184,0.18)_0%,rgba(148,163,184,0)_70%)] blur-2xl"></div>
             </div>
 
             <main
@@ -26,9 +26,9 @@
                 x-cloak
             >
                 <header class="space-y-6 animate-[rise_0.8s_ease-out]">
-                    <div class="inline-flex items-center gap-2 rounded-full border border-amber-200/70 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-amber-900">
+                    <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
                         Conscious Spending Plan
-                        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                        <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
                     </div>
                     <div class="grid gap-6 lg:grid-cols-[1.25fr,0.9fr]">
                         <div>
@@ -40,7 +40,7 @@
                             </p>
                             <div class="mt-6 flex flex-wrap items-center gap-4">
                                 <button
-                                    class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                                    class="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                                     type="button"
                                     @click="savePlan"
                                     :disabled="saving"
@@ -51,13 +51,13 @@
                                 <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>
                             </div>
                         </div>
-                        <div class="rounded-2xl border border-slate-200/70 bg-white/80 p-5 shadow-sm">
+                        <div class="rounded-lg border border-slate-200/70 bg-white/80 p-5 shadow-sm">
                             <h2 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Partner Labels</h2>
                             <div class="mt-4 grid gap-4">
                                 <label class="text-sm font-medium text-slate-700">
                                     Partner 1
                                     <input
-                                        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-base focus:border-amber-400 focus:outline-none"
+                                        class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
                                         type="text"
                                         x-model="partners[0].name"
                                         placeholder="Partner 1"
@@ -66,7 +66,7 @@
                                 <label class="text-sm font-medium text-slate-700">
                                     Partner 2
                                     <input
-                                        class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-base focus:border-amber-400 focus:outline-none"
+                                        class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
                                         type="text"
                                         x-model="partners[1].name"
                                         placeholder="Partner 2"
@@ -78,18 +78,18 @@
                 </header>
 
                 <section class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <div class="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Net Income</p>
                         <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalIncomeNet())"></p>
                         <p class="mt-1 text-xs text-slate-500" x-text="formatCurrency(totalIncomeGross()) + ' gross'"></p>
                     </div>
-                    <div class="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Expenses</p>
                         <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalExpenses())"></p>
                         <p class="mt-1 text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
                         ></p>
                     </div>
-                    <div class="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Investing + Saving</p>
                         <p
                             class="mt-3 text-2xl font-semibold text-slate-900"
@@ -100,14 +100,14 @@
                             x-text="formatPercent(shareOfIncome(totalInvesting() + totalSavingGoals(), totalIncomeNet())) + ' of net income'"
                         ></p>
                     </div>
-                    <div class="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
                         <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Guilt-Free</p>
                         <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></p>
                         <p class="mt-1 text-xs text-slate-500">Available after goals.</p>
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Net Worth Snapshot</h2>
@@ -147,7 +147,7 @@
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Income</h2>
@@ -177,7 +177,7 @@
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Total Expenses</h2>
@@ -189,13 +189,13 @@
                             ></span>
                         </div>
                     </div>
-                    <div class="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-200/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <div class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         <span class="font-semibold">Buffer</span>
                         <label class="flex items-center gap-2">
-                            <input class="h-8 w-20 rounded-lg border border-amber-200 bg-white px-2" type="number" step="1" x-model.number="bufferPercent" />
+                            <input class="h-8 w-20 rounded-md border border-slate-200 bg-white px-2" type="number" step="1" x-model.number="bufferPercent" />
                             <span>% of subtotal</span>
                         </label>
-                        <span class="text-xs text-amber-700" x-text="'Adds ' + formatCurrency(expensesBuffer()) + ' total'"
+                        <span class="text-xs text-slate-500" x-text="'Adds ' + formatCurrency(expensesBuffer()) + ' total'"
                         ></span>
                     </div>
                     <div class="mt-6 grid gap-3">
@@ -219,7 +219,7 @@
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Investing</h2>
@@ -252,7 +252,7 @@
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Saving Goals</h2>
@@ -285,7 +285,7 @@
                     </div>
                 </section>
 
-                <section class="rounded-3xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h2 class="text-xl font-semibold text-slate-900">Guilt-Free Spending</h2>
@@ -296,7 +296,7 @@
                             <span x-text="partnerName(1) + ': ' + formatCurrency(guiltyFreeSpending(1))"></span>
                         </div>
                     </div>
-                    <div class="mt-6 grid gap-3 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                    <div class="mt-6 grid gap-3 rounded-lg border border-slate-200/70 bg-slate-50 px-4 py-5 text-sm text-slate-600">
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <span>Total guilt-free spending (combined)</span>
                             <span class="text-base font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></span>
