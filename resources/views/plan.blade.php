@@ -20,26 +20,35 @@
                 <div class="absolute bottom-[-18%] right-10 h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(148,163,184,0.18)_0%,rgba(148,163,184,0)_70%)] blur-2xl"></div>
             </div>
 
+            <header class="w-full border border-slate-200/70 bg-white/80 shadow-sm">
+                <div class="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-slate-600 md:px-8">
+                    <div class="flex items-center gap-4">
+                        <a class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700" href="{{ route('plan.show') }}">
+                            Conscious Spending Plan
+                            <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
+                        </a>
+                        <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.show') }}">Plans</a>
+                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.snapshots.summary') }}">Snapshots</a>
+                        </nav>
+                    </div>
+                    <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                        <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('account.edit') }}">Profile</a>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button class="text-slate-600 transition hover:text-slate-900" type="submit">Logout</button>
+                        </form>
+                    </nav>
+                </div>
+            </header>
+
             <main
                 class="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:py-16"
                 x-data="cspPlan()"
                 x-cloak
             >
-                <div class="flex flex-wrap items-center justify-between gap-4 text-sm font-semibold text-slate-600">
-                    <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
-                        Signed in as {{ auth()->user()->name }}
-                        <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('account.edit') }}">Account</a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button class="text-slate-600 transition hover:text-slate-900" type="submit">Logout</button>
-                        </form>
-                    </div>
-                </div>
 
-                <header class="space-y-6 animate-[rise_0.8s_ease-out]">
+                <section class="space-y-6 animate-[rise_0.8s_ease-out]">
                     <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
                         Conscious Spending Plan
                         <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
@@ -61,6 +70,14 @@
                                 >
                                     <span x-text="saving ? 'Saving...' : 'Save Plan'"></span>
                                 </button>
+                                <button
+                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
+                                    type="button"
+                                    @click="createSnapshot"
+                                    :disabled="snapshotSaving || saving"
+                                >
+                                    <span x-text="snapshotSaving ? 'Creating...' : 'Create Snapshot'"></span>
+                                </button>
                                 <a
                                     class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
                                     href="{{ route('plan.export.csv') }}"
@@ -74,6 +91,7 @@
                                     Export PDF
                                 </a>
                                 <span class="text-sm text-slate-500" x-text="saveNotice" x-show="saveNotice"></span>
+                                <span class="text-sm text-slate-500" x-text="snapshotNotice" x-show="snapshotNotice"></span>
                                 <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>
                             </div>
                         </div>
@@ -113,7 +131,7 @@
                             </div>
                         </div>
                     </div>
-                </header>
+                </section>
 
                 <section class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">

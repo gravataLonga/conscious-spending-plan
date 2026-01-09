@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePlanSnapshotRequest;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseEntry;
 use App\Models\Income;
@@ -10,6 +11,7 @@ use App\Models\InvestingEntry;
 use App\Models\NetWorth;
 use App\Models\Partner;
 use App\Models\Plan;
+use App\Models\PlanSnapshot;
 use App\Models\SavingGoalCategory;
 use App\Models\SavingGoalEntry;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -43,6 +45,11 @@ class SpendingPlanController extends Controller
         'Vacation',
         'Gifts',
         'Long Term Emergency Fund',
+    ];
+
+    private const DEFAULT_PARTNERS = [
+        'Partner 1',
+        'Partner 2',
     ];
 
     public function show()
@@ -240,6 +247,70 @@ class SpendingPlanController extends Controller
         return $pdf->download($filename);
     }
 
+    public function snapshotSummary()
+    {
+        return view('snapshots');
+    }
+
+    public function snapshotSummaryData()
+    {
+        $plan = $this->ensurePlan();
+        $snapshots = $plan->snapshots()->reorder('captured_at')->get();
+
+        $summaries = $snapshots->map(function (PlanSnapshot $snapshot) {
+            return $this->summarizeSnapshot($snapshot);
+        })->values()->all();
+
+        $latest = empty($summaries) ? null : $summaries[array_key_last($summaries)];
+
+        return response()->json([
+            'snapshots' => $summaries,
+            'latest' => $latest,
+        ]);
+    }
+
+    public function snapshots()
+    {
+        $plan = $this->ensurePlan();
+
+        $snapshots = $plan->snapshots()->get()->map(function (PlanSnapshot $snapshot) {
+            return $this->serializeSnapshot($snapshot);
+        })->values()->all();
+
+        return response()->json(['snapshots' => $snapshots]);
+    }
+
+    public function showSnapshot(PlanSnapshot $snapshot)
+    {
+        $plan = $this->ensurePlan();
+
+        if ($snapshot->plan_id !== $plan->id) {
+            abort(404);
+        }
+
+        return response()->json([
+            'snapshot' => $this->serializeSnapshot($snapshot),
+            'data' => $snapshot->payload ?? [],
+        ]);
+    }
+
+    public function storeSnapshot(StorePlanSnapshotRequest $request)
+    {
+        $plan = $this->ensurePlan();
+        $payload = $this->serializePlan($plan);
+        $name = $request->validated()['name'] ?? now()->format('F Y');
+
+        $snapshot = $plan->snapshots()->create([
+            'name' => $name,
+            'captured_at' => now(),
+            'payload' => $payload,
+        ]);
+
+        return response()->json([
+            'snapshot' => $this->serializeSnapshot($snapshot),
+        ], 201);
+    }
+
     private function ensurePlan(): Plan
     {
         $plan = Plan::first();
@@ -251,6 +322,7 @@ class SpendingPlanController extends Controller
         $this->ensureCategories($plan, ExpenseCategory::class, self::DEFAULT_EXPENSES);
         $this->ensureCategories($plan, InvestingCategory::class, self::DEFAULT_INVESTING);
         $this->ensureCategories($plan, SavingGoalCategory::class, self::DEFAULT_SAVING_GOALS);
+        $this->ensurePartners($plan);
 
         return $plan->fresh([
             'partners',
@@ -305,6 +377,17 @@ class SpendingPlanController extends Controller
                 'name' => $name,
                 'sort' => $index + 1,
             ]);
+        }
+    }
+
+    private function ensurePartners(Plan $plan): void
+    {
+        if ($plan->partners()->exists()) {
+            return;
+        }
+
+        foreach (self::DEFAULT_PARTNERS as $partnerName) {
+            $plan->partners()->create(['name' => $partnerName]);
         }
     }
 
@@ -428,6 +511,68 @@ class SpendingPlanController extends Controller
                 ];
             })->values()->all(),
         ];
+    }
+
+    private function serializeSnapshot(PlanSnapshot $snapshot): array
+    {
+        return [
+            'id' => $snapshot->id,
+            'name' => $snapshot->name,
+            'captured_at' => optional($snapshot->captured_at)->toIso8601String(),
+        ];
+    }
+
+    private function summarizeSnapshot(PlanSnapshot $snapshot): array
+    {
+        $payload = $snapshot->payload ?? [];
+
+        $assets = 0.0;
+        $investingTotal = 0.0;
+        $savingTotal = 0.0;
+        $netWorthTotal = 0.0;
+
+        foreach ($payload['netWorth'] ?? [] as $entry) {
+            $assetsValue = (float) ($entry['assets'] ?? 0);
+            $investedValue = (float) ($entry['invested'] ?? 0);
+            $savingValue = (float) ($entry['saving'] ?? 0);
+            $debtValue = (float) ($entry['debt'] ?? 0);
+
+            $assets += $assetsValue;
+            $investingTotal += $investedValue;
+            $savingTotal += $savingValue;
+            $netWorthTotal += $assetsValue + $investedValue + $savingValue - $debtValue;
+        }
+
+        $expensesSubtotal = $this->sumCategoryValues($payload['expenses'] ?? []);
+        $bufferPercent = (float) ($payload['plan']['buffer_percent'] ?? 0);
+        $expenses = $expensesSubtotal + ($expensesSubtotal * $bufferPercent / 100);
+
+        return [
+            'id' => $snapshot->id,
+            'name' => $snapshot->name,
+            'captured_at' => optional($snapshot->captured_at)->toIso8601String(),
+            'assets' => $assets,
+            'expenses' => $expenses,
+            'investing' => $investingTotal,
+            'saving' => $savingTotal,
+            'net_worth' => $netWorthTotal,
+        ];
+    }
+
+    /**
+     * @param  array<int, array{values?: array<int, float|int|string|null>}>  $categories
+     */
+    private function sumCategoryValues(array $categories): float
+    {
+        $total = 0.0;
+
+        foreach ($categories as $category) {
+            foreach ($category['values'] ?? [] as $value) {
+                $total += (float) $value;
+            }
+        }
+
+        return $total;
     }
 
     /**

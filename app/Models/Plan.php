@@ -42,4 +42,9 @@ class Plan extends Model
     {
         return $this->hasMany(SavingGoalCategory::class)->orderBy('sort');
     }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(PlanSnapshot::class)->latest('captured_at');
+    }
 }

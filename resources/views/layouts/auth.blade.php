@@ -20,28 +20,46 @@
                 <div class="absolute bottom-[-18%] right-6 h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(148,163,184,0.18)_0%,rgba(148,163,184,0)_70%)] blur-2xl"></div>
             </div>
 
-            <main class="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-10 md:py-16">
-                <div class="flex items-center justify-between">
-                    <a class="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-600" href="{{ url('/') }}">
-                        Conscious Spending Plan
-                        <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
-                    </a>
-                    <div class="flex items-center gap-3 text-sm font-semibold">
-                        @auth
-                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('account.edit') }}">Account</a>
+            @auth
+                <header class="w-full border border-slate-200/70 bg-white/80 shadow-sm">
+                    <div class="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-slate-600 md:px-8">
+                        <div class="flex items-center gap-4">
+                            <a class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700" href="{{ route('plan.show') }}">
+                                Conscious Spending Plan
+                                <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
+                            </a>
+                            <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                                <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.show') }}">Plans</a>
+                                <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.snapshots.summary') }}">Snapshots</a>
+                            </nav>
+                        </div>
+                        <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('account.edit') }}">Profile</a>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button class="text-slate-600 transition hover:text-slate-900" type="submit">Logout</button>
                             </form>
-                        @else
+                        </nav>
+                    </div>
+                </header>
+            @else
+                <header class="w-full border border-slate-200/70 bg-white/80 shadow-sm">
+                    <div class="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-slate-600 md:px-8">
+                        <a class="inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-600" href="{{ url('/') }}">
+                            Conscious Spending Plan
+                            <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
+                        </a>
+                        <div class="flex items-center gap-3 text-sm font-semibold">
                             <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('login') }}">Login</a>
                             <a class="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white transition hover:bg-slate-800" href="{{ route('register') }}">
                                 Register
                             </a>
-                        @endauth
+                        </div>
                     </div>
-                </div>
+                </header>
+            @endauth
 
+            <main class="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-10 md:py-16">
                 <div class="mt-10 flex flex-1 items-center justify-center">
                     <div class="w-full max-w-xl">
                         @yield('content')

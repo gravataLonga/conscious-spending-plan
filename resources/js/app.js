@@ -1,5 +1,6 @@
 import './bootstrap';
 import Alpine from 'alpinejs';
+import { createChart, LineSeries } from 'lightweight-charts';
 
 window.Alpine = Alpine;
 
@@ -7,7 +8,9 @@ window.cspPlan = function () {
     return {
         loading: true,
         saving: false,
+        snapshotSaving: false,
         saveNotice: '',
+        snapshotNotice: '',
         partners: [
             { id: null, name: 'Partner 1' },
             { id: null, name: 'Partner 2' },
@@ -328,22 +331,371 @@ window.cspPlan = function () {
                 this.loading = false;
             }
         },
-        async savePlan() {
+        async savePlan(options = {}) {
             this.saving = true;
-            this.saveNotice = '';
+            if (!options.silent) {
+                this.saveNotice = '';
+            }
             try {
                 const response = await window.axios.post('/plan', this.buildPayload());
                 this.applyPlan(response.data);
-                this.saveNotice = 'Saved just now.';
+                if (!options.silent) {
+                    this.saveNotice = 'Saved just now.';
+                }
+                return true;
             } catch (error) {
                 console.error(error);
-                this.saveNotice = 'Save failed. Try again.';
+                if (!options.silent) {
+                    this.saveNotice = 'Save failed. Try again.';
+                }
+                return false;
             } finally {
                 this.saving = false;
+                if (!options.silent) {
+                    setTimeout(() => {
+                        this.saveNotice = '';
+                    }, 2500);
+                }
+            }
+        },
+        async createSnapshot() {
+            this.snapshotSaving = true;
+            this.snapshotNotice = '';
+
+            const saved = await this.savePlan({ silent: true });
+            if (!saved) {
+                this.snapshotSaving = false;
+                this.snapshotNotice = 'Snapshot failed. Please save again.';
                 setTimeout(() => {
-                    this.saveNotice = '';
+                    this.snapshotNotice = '';
+                }, 2500);
+                return;
+            }
+
+            try {
+                await window.axios.post('/plan/snapshots');
+                this.snapshotNotice = 'Snapshot created.';
+            } catch (error) {
+                console.error(error);
+                this.snapshotNotice = 'Snapshot failed. Try again.';
+            } finally {
+                this.snapshotSaving = false;
+                setTimeout(() => {
+                    this.snapshotNotice = '';
                 }, 2500);
             }
+        },
+    };
+};
+
+window.cspSnapshots = function () {
+    return {
+        loading: true,
+        snapshots: [],
+        latest: null,
+        currentNetWorth: null,
+        chart: null,
+        series: {},
+        resizeHandler: null,
+        resizeObserver: null,
+        init() {
+            this.fetchSummary();
+        },
+        formatCurrency(value) {
+            const formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 0,
+            });
+
+            return formatter.format(Math.round(value ?? 0));
+        },
+        formatDate(value) {
+            if (!value) {
+                return '';
+            }
+
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) {
+                return '';
+            }
+
+            return new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+            }).format(date);
+        },
+        async fetchSummary() {
+            this.loading = true;
+            try {
+                const [summaryResponse, planResponse] = await Promise.all([
+                    window.axios.get('/plan/snapshots/summary/data'),
+                    window.axios.get('/plan/data'),
+                ]);
+
+                this.snapshots = summaryResponse.data.snapshots ?? [];
+                this.latest = summaryResponse.data.latest ?? null;
+                this.currentNetWorth = this.calculateNetWorth(planResponse.data);
+                this.$nextTick(() => {
+                    this.renderChart();
+                });
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        calculateNetWorth(planData) {
+            if (!planData || !Array.isArray(planData.netWorth)) {
+                return null;
+            }
+
+            return planData.netWorth.reduce((total, entry) => {
+                const assets = Number(entry.assets ?? 0);
+                const invested = Number(entry.invested ?? 0);
+                const saving = Number(entry.saving ?? 0);
+                const debt = Number(entry.debt ?? 0);
+
+                return total + assets + invested + saving - debt;
+            }, 0);
+        },
+        latestSnapshot() {
+            if (this.latest) {
+                return this.latest;
+            }
+
+            return this.snapshots.length ? this.snapshots[this.snapshots.length - 1] : null;
+        },
+        latestSnapshotNetWorth() {
+            return Number(this.latestSnapshot()?.net_worth ?? 0);
+        },
+        previousSnapshot() {
+            if (this.snapshots.length < 2) {
+                return null;
+            }
+
+            return this.snapshots[this.snapshots.length - 2];
+        },
+        previousSnapshotNetWorth() {
+            return Number(this.previousSnapshot()?.net_worth ?? 0);
+        },
+        netWorthDelta() {
+            if (this.currentNetWorth === null || !this.previousSnapshot()) {
+                return null;
+            }
+
+            return Number(this.currentNetWorth) - this.previousSnapshotNetWorth();
+        },
+        netWorthTrend() {
+            const delta = this.netWorthDelta();
+
+            if (delta === null || delta === 0) {
+                return 0;
+            }
+
+            return delta > 0 ? 1 : -1;
+        },
+        metricDelta(key) {
+            const latest = this.latestSnapshot();
+            const previous = this.previousSnapshot();
+
+            if (!latest || !previous) {
+                return null;
+            }
+
+            return Number(latest[key] ?? 0) - Number(previous[key] ?? 0);
+        },
+        metricTrend(key) {
+            const delta = this.metricDelta(key);
+
+            if (delta === null) {
+                return 0;
+            }
+
+            if (delta === 0) {
+                return 0;
+            }
+
+            if (key === 'expenses') {
+                return delta < 0 ? 1 : -1;
+            }
+
+            return delta > 0 ? 1 : -1;
+        },
+        trendClass(key) {
+            const trend = this.metricTrend(key);
+
+            if (trend > 0) {
+                return 'text-emerald-600';
+            }
+
+            if (trend < 0) {
+                return 'text-rose-600';
+            }
+
+            return 'text-slate-400';
+        },
+        trendBadgeClass(key) {
+            const trend = this.metricTrend(key);
+
+            if (trend > 0) {
+                return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+            }
+
+            if (trend < 0) {
+                return 'bg-rose-50 text-rose-600 border-rose-200';
+            }
+
+            return 'bg-slate-50 text-slate-400 border-slate-200';
+        },
+        netWorthTrendClass() {
+            const trend = this.netWorthTrend();
+
+            if (trend > 0) {
+                return 'text-emerald-600';
+            }
+
+            if (trend < 0) {
+                return 'text-rose-600';
+            }
+
+            return 'text-slate-400';
+        },
+        netWorthTrendBadgeClass() {
+            const trend = this.netWorthTrend();
+
+            if (trend > 0) {
+                return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+            }
+
+            if (trend < 0) {
+                return 'bg-rose-50 text-rose-600 border-rose-200';
+            }
+
+            return 'bg-slate-50 text-slate-400 border-slate-200';
+        },
+        formatNetWorthDelta() {
+            const delta = this.netWorthDelta();
+
+            if (delta === null) {
+                return '';
+            }
+
+            const sign = delta > 0 ? '+' : '';
+            const value = this.formatCurrency(Math.abs(delta));
+
+            return `${sign}${value}`;
+        },
+        formatDelta(key) {
+            const delta = this.metricDelta(key);
+
+            if (delta === null) {
+                return '';
+            }
+
+            const sign = delta > 0 ? '+' : '';
+            const value = this.formatCurrency(Math.abs(delta));
+
+            return `${sign}${value}`;
+        },
+        snapshotSeries(key) {
+            return this.snapshots
+                .map((snapshot) => {
+                    const date = snapshot.captured_at ? new Date(snapshot.captured_at) : null;
+                    if (!date || Number.isNaN(date.getTime())) {
+                        return null;
+                    }
+
+                    return {
+                        time: date.toISOString().split('T')[0],
+                        value: Number(snapshot[key] ?? 0),
+                    };
+                })
+                .filter(Boolean);
+        },
+        renderChart() {
+            if (!this.$refs.chart || this.snapshots.length === 0) {
+                return;
+            }
+
+            if (this.chart) {
+                this.chart.remove();
+                this.chart = null;
+                this.series = {};
+            }
+
+            const width = this.$refs.chart.clientWidth || 600;
+            this.chart = createChart(this.$refs.chart, {
+                width,
+                height: 240,
+                layout: {
+                    background: { type: 'solid', color: 'transparent' },
+                    textColor: '#64748b',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(148, 163, 184, 0.15)' },
+                    horzLines: { color: 'rgba(148, 163, 184, 0.15)' },
+                },
+                rightPriceScale: {
+                    borderColor: 'rgba(148, 163, 184, 0.4)',
+                },
+                timeScale: {
+                    borderColor: 'rgba(148, 163, 184, 0.4)',
+                },
+                crosshair: {
+                    mode: 0,
+                },
+            });
+
+            this.series.assets = this.chart.addSeries(LineSeries, {
+                color: '#0f172a',
+                lineWidth: 2,
+            });
+            this.series.expenses = this.chart.addSeries(LineSeries, {
+                color: '#64748b',
+                lineWidth: 2,
+            });
+            this.series.investing = this.chart.addSeries(LineSeries, {
+                color: '#10b981',
+                lineWidth: 2,
+            });
+            this.series.saving = this.chart.addSeries(LineSeries, {
+                color: '#f59e0b',
+                lineWidth: 2,
+            });
+
+            this.series.assets.setData(this.snapshotSeries('assets'));
+            this.series.expenses.setData(this.snapshotSeries('expenses'));
+            this.series.investing.setData(this.snapshotSeries('investing'));
+            this.series.saving.setData(this.snapshotSeries('saving'));
+
+            this.chart.timeScale().fitContent();
+
+            if (!this.resizeHandler) {
+                this.resizeHandler = () => {
+                    if (this.chart && this.$refs.chart) {
+                        this.chart.applyOptions({ width: this.$refs.chart.clientWidth });
+                    }
+                };
+                window.addEventListener('resize', this.resizeHandler);
+            }
+
+            if (!this.resizeObserver && window.ResizeObserver) {
+                this.resizeObserver = new ResizeObserver(() => {
+                    if (this.chart && this.$refs.chart) {
+                        this.chart.applyOptions({ width: this.$refs.chart.clientWidth });
+                    }
+                });
+                this.resizeObserver.observe(this.$refs.chart);
+            }
+
+            requestAnimationFrame(() => {
+                if (this.chart && this.$refs.chart) {
+                    this.chart.applyOptions({ width: this.$refs.chart.clientWidth });
+                    this.chart.timeScale().fitContent();
+                }
+            });
         },
     };
 };
