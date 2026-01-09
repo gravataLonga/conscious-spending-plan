@@ -13,7 +13,6 @@ use App\Models\Plan;
 use App\Models\SavingGoalCategory;
 use App\Models\SavingGoalEntry;
 use App\Models\User;
-use App\PlanDefaults;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
@@ -24,7 +23,9 @@ class PlanSnapshotSeeder extends Seeder
      */
     public function run(): void
     {
-        $user = User::find(1);
+        $data = $this->planSnapshotData();
+
+        $user = User::firstWhere('email', $data['user']['email']);
 
         if (! $user) {
             return;
@@ -33,119 +34,63 @@ class PlanSnapshotSeeder extends Seeder
         $plan = Plan::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'name' => 'Default Plan',
-                'currency' => 'USD',
-                'buffer_percent' => 15,
+                'name' => $data['plan']['name'],
+                'currency' => $data['plan']['currency'],
+                'buffer_percent' => $data['plan']['buffer_percent'],
             ]
         );
 
         $this->resetPlanData($plan);
 
-        $partners = $this->seedPartners($plan);
-        $netWorthBase = [
-            [
-                'assets' => 150000,
-                'invested' => 65000,
-                'saving' => 12000,
-                'debt' => 20000,
-            ],
-            [
-                'assets' => 95000,
-                'invested' => 42000,
-                'saving' => 9000,
-                'debt' => 12000,
-            ],
-        ];
+        $partners = collect($data['partners'])
+            ->map(fn (array $partner) => $plan->partners()->create(['name' => $partner['name']]))
+            ->values()
+            ->all();
 
-        $incomeBase = [
-            [
-                'net' => 78000,
-                'gross' => 104000,
-            ],
-            [
-                'net' => 64000,
-                'gross' => 88000,
-            ],
-        ];
-
-        $this->seedNetWorths($plan, $partners, $netWorthBase);
-        $this->seedIncomes($plan, $partners, $incomeBase);
-
-        $expenseDefinitions = $this->buildCategoryDefinitions(PlanDefaults::Expenses->labels(), [
-            [1800, 1600],
-            [260, 230],
-            [220, 200],
-            [350, 325],
-            [520, 460],
-            [140, 110],
-            [120, 110],
-            [80, 70],
-            [200, 150],
-        ]);
-
-        $investingDefinitions = $this->buildCategoryDefinitions(PlanDefaults::Investing->labels(), [
-            [450, 320],
-            [300, 250],
-            [140, 100],
-        ]);
-
-        $savingGoalDefinitions = $this->buildCategoryDefinitions(PlanDefaults::SavingGoals->labels(), [
-            [220, 180],
-            [90, 60],
-            [300, 240],
-        ]);
+        $this->seedNetWorths($plan, $partners, $data['netWorth']);
+        $this->seedIncomes($plan, $partners, $data['income']);
 
         $expenseCategories = $this->seedCategories(
             $plan,
             ExpenseCategory::class,
             ExpenseEntry::class,
-            $expenseDefinitions,
-            $partners
+            $data['expenses'],
+            $partners,
+            'expense_category_id'
         );
 
         $investingCategories = $this->seedCategories(
             $plan,
             InvestingCategory::class,
             InvestingEntry::class,
-            $investingDefinitions,
-            $partners
+            $data['investing'],
+            $partners,
+            'investing_category_id'
         );
 
         $savingGoalCategories = $this->seedCategories(
             $plan,
             SavingGoalCategory::class,
             SavingGoalEntry::class,
-            $savingGoalDefinitions,
-            $partners
+            $data['savingGoals'],
+            $partners,
+            'saving_goal_category_id'
         );
 
-        $start = Carbon::now()->subYears(5)->startOfMonth();
-        $factor = 1.0;
+        $payload = $this->buildPayload(
+            $plan,
+            $partners,
+            $data,
+            $expenseCategories,
+            $investingCategories,
+            $savingGoalCategories
+        );
 
-        for ($month = 0; $month < 60; $month++) {
-            $factor *= $month % 2 === 0 ? 1.10 : 0.95;
-            $capturedAt = $start->copy()->addMonths($month);
-
-            $payload = $this->buildPayload(
-                $plan,
-                $partners,
-                $netWorthBase,
-                $incomeBase,
-                $expenseDefinitions,
-                $investingDefinitions,
-                $savingGoalDefinitions,
-                $expenseCategories,
-                $investingCategories,
-                $savingGoalCategories,
-                $factor
-            );
-
-            $plan->snapshots()->create([
-                'name' => $capturedAt->format('F Y'),
-                'captured_at' => $capturedAt,
-                'payload' => $payload,
-            ]);
-        }
+        $plan->snapshots()->create([
+            'name' => $data['snapshot']['name'],
+            'captured_at' => Carbon::parse($data['snapshot']['captured_at']),
+            'payload' => $payload,
+        ]);
     }
 
     private function resetPlanData(Plan $plan): void
@@ -160,22 +105,13 @@ class PlanSnapshotSeeder extends Seeder
     }
 
     /**
-     * @return array<int, Partner>
+     * @param  array<int, array{assets: float|int, invested: float|int, saving: float|int, debt: float|int}>  $netWorthData
+     * @param  array<int, Partner>  $partners
      */
-    private function seedPartners(Plan $plan): array
-    {
-        return collect(PlanDefaults::Partners->labels())
-            ->map(fn (string $name) => $plan->partners()->create(['name' => $name]))
-            ->all();
-    }
-
-    /**
-     * @param  array<int, array{assets: float|int, invested: float|int, saving: float|int, debt: float|int}>  $netWorthBase
-     */
-    private function seedNetWorths(Plan $plan, array $partners, array $netWorthBase): void
+    private function seedNetWorths(Plan $plan, array $partners, array $netWorthData): void
     {
         foreach ($partners as $index => $partner) {
-            $payload = $netWorthBase[$index] ?? [
+            $payload = $netWorthData[$index] ?? [
                 'assets' => 0,
                 'invested' => 0,
                 'saving' => 0,
@@ -194,12 +130,13 @@ class PlanSnapshotSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, array{net: float|int, gross: float|int}>  $incomeBase
+     * @param  array<int, array{net: float|int, gross: float|int}>  $incomeData
+     * @param  array<int, Partner>  $partners
      */
-    private function seedIncomes(Plan $plan, array $partners, array $incomeBase): void
+    private function seedIncomes(Plan $plan, array $partners, array $incomeData): void
     {
         foreach ($partners as $index => $partner) {
-            $payload = $incomeBase[$index] ?? [
+            $payload = $incomeData[$index] ?? [
                 'net' => 0,
                 'gross' => 0,
             ];
@@ -214,23 +151,6 @@ class PlanSnapshotSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, string>  $labels
-     * @param  array<int, array<int, float|int>>  $values
-     * @return array<int, array{label: string, values: array<int, float|int>}>
-     */
-    private function buildCategoryDefinitions(array $labels, array $values): array
-    {
-        return collect($labels)
-            ->map(function (string $label, int $index) use ($values) {
-                return [
-                    'label' => $label,
-                    'values' => $values[$index] ?? [],
-                ];
-            })
-            ->all();
-    }
-
-    /**
      * @param  class-string  $categoryModel
      * @param  class-string  $entryModel
      * @param  array<int, array{label: string, values: array<int, float|int>}>  $definitions
@@ -242,7 +162,8 @@ class PlanSnapshotSeeder extends Seeder
         string $categoryModel,
         string $entryModel,
         array $definitions,
-        array $partners
+        array $partners,
+        string $foreignKey
     ): array {
         $categories = [];
 
@@ -257,7 +178,7 @@ class PlanSnapshotSeeder extends Seeder
                 $values = $definition['values'] ?? [];
 
                 $entryModel::create([
-                    $this->resolveForeignKey($categoryModel) => $category->id,
+                    $foreignKey => $category->id,
                     'partner_id' => $partner->id,
                     'amount' => (float) ($values[$partnerIndex] ?? 0),
                 ]);
@@ -270,20 +191,22 @@ class PlanSnapshotSeeder extends Seeder
     }
 
     /**
+     * @param  array<int, Partner>  $partners
+     * @param  array<int, array{label: string, values: array<int, float|int>}>  $expenses
+     * @param  array<int, array{label: string, values: array<int, float|int>}>  $investing
+     * @param  array<int, array{label: string, values: array<int, float|int>}>  $savingGoals
+     * @param  array<int, object>  $expenseCategories
+     * @param  array<int, object>  $investingCategories
+     * @param  array<int, object>  $savingGoalCategories
      * @return array<string, mixed>
      */
     private function buildPayload(
         Plan $plan,
         array $partners,
-        array $netWorthBase,
-        array $incomeBase,
-        array $expenseDefinitions,
-        array $investingDefinitions,
-        array $savingGoalDefinitions,
+        array $data,
         array $expenseCategories,
         array $investingCategories,
-        array $savingGoalCategories,
-        float $factor
+        array $savingGoalCategories
     ): array {
         return [
             'plan' => [
@@ -298,16 +221,16 @@ class PlanSnapshotSeeder extends Seeder
                 ])
                 ->values()
                 ->all(),
-            'netWorth' => $this->scaleStructuredEntries($netWorthBase, $factor, [
+            'netWorth' => $this->castStructuredEntries($data['netWorth'], [
                 'assets',
                 'invested',
                 'saving',
                 'debt',
             ]),
-            'income' => $this->scaleStructuredEntries($incomeBase, $factor, ['net', 'gross']),
-            'expenses' => $this->mapCategoryPayload($expenseDefinitions, $expenseCategories, $factor),
-            'investing' => $this->mapCategoryPayload($investingDefinitions, $investingCategories, $factor),
-            'savingGoals' => $this->mapCategoryPayload($savingGoalDefinitions, $savingGoalCategories, $factor),
+            'income' => $this->castStructuredEntries($data['income'], ['net', 'gross']),
+            'expenses' => $this->mapCategoryPayload($data['expenses'], $expenseCategories),
+            'investing' => $this->mapCategoryPayload($data['investing'], $investingCategories),
+            'savingGoals' => $this->mapCategoryPayload($data['savingGoals'], $savingGoalCategories),
         ];
     }
 
@@ -316,18 +239,17 @@ class PlanSnapshotSeeder extends Seeder
      * @param  array<int, string>  $keys
      * @return array<int, array<string, float>>
      */
-    private function scaleStructuredEntries(array $entries, float $factor, array $keys): array
+    private function castStructuredEntries(array $entries, array $keys): array
     {
         return collect($entries)
-            ->map(function (array $entry) use ($factor, $keys) {
-                $scaled = [];
+            ->map(function (array $entry) use ($keys) {
+                $casted = [];
 
                 foreach ($keys as $key) {
-                    $value = (float) ($entry[$key] ?? 0);
-                    $scaled[$key] = round($value * $factor, 2);
+                    $casted[$key] = (float) ($entry[$key] ?? 0);
                 }
 
-                return $scaled;
+                return $casted;
             })
             ->all();
     }
@@ -337,32 +259,141 @@ class PlanSnapshotSeeder extends Seeder
      * @param  array<int, object>  $categories
      * @return array<int, array{id: int, label: string, values: array<int, float>}>
      */
-    private function mapCategoryPayload(array $definitions, array $categories, float $factor): array
+    private function mapCategoryPayload(array $definitions, array $categories): array
     {
         return collect($definitions)
-            ->map(function (array $definition, int $index) use ($categories, $factor) {
+            ->map(function (array $definition, int $index) use ($categories) {
                 $category = $categories[$index];
-                $values = array_map(
-                    fn ($value) => round((float) $value * $factor, 2),
-                    $definition['values']
-                );
 
                 return [
                     'id' => $category->id,
                     'label' => $definition['label'],
-                    'values' => $values,
+                    'values' => array_map(
+                        fn ($value) => (float) $value,
+                        $definition['values']
+                    ),
                 ];
             })
             ->all();
     }
 
-    private function resolveForeignKey(string $categoryModel): string
+    /**
+     * @return array{
+     *     user: array{email: string},
+     *     plan: array{name: string, currency: string, buffer_percent: float|int},
+     *     partners: array<int, array{name: string}>,
+     *     netWorth: array<int, array{assets: float|int, invested: float|int, saving: float|int, debt: float|int}>,
+     *     income: array<int, array{net: float|int, gross: float|int}>,
+     *     expenses: array<int, array{label: string, values: array<int, float|int>}>,
+     *     investing: array<int, array{label: string, values: array<int, float|int>}>,
+     *     savingGoals: array<int, array{label: string, values: array<int, float|int>}>,
+     *     snapshot: array{name: string, captured_at: string}
+     * }
+     */
+    private function planSnapshotData(): array
     {
-        return match ($categoryModel) {
-            ExpenseCategory::class => 'expense_category_id',
-            InvestingCategory::class => 'investing_category_id',
-            SavingGoalCategory::class => 'saving_goal_category_id',
-            default => 'category_id',
-        };
+        return [
+            'user' => [
+                'email' => 'me@jonathan.pt',
+            ],
+            'plan' => [
+                'name' => 'Default Plan',
+                'currency' => 'USD',
+                'buffer_percent' => 15,
+            ],
+            'partners' => [
+                [
+                    'name' => 'Mariana & Jonathan',
+                ],
+            ],
+            'netWorth' => [
+                [
+                    'assets' => 15000,
+                    'invested' => 17484,
+                    'saving' => 10863,
+                    'debt' => 0,
+                ],
+            ],
+            'income' => [
+                [
+                    'net' => 3900,
+                    'gross' => 3900,
+                ],
+            ],
+            'expenses' => [
+                [
+                    'label' => 'Rent or Mortgage',
+                    'values' => [600],
+                ],
+                [
+                    'label' => 'Utilities',
+                    'values' => [200],
+                ],
+                [
+                    'label' => 'Car & Commute',
+                    'values' => [150],
+                ],
+                [
+                    'label' => 'Groceries',
+                    'values' => [350],
+                ],
+                [
+                    'label' => 'Pet',
+                    'values' => [80],
+                ],
+                [
+                    'label' => 'Health & Well Bean',
+                    'values' => [150],
+                ],
+                [
+                    'label' => 'Debt',
+                    'values' => [100],
+                ],
+            ],
+            'investing' => [
+                [
+                    'label' => 'PPR',
+                    'values' => [313],
+                ],
+                [
+                    'label' => 'ETF',
+                    'values' => [600],
+                ],
+                [
+                    'label' => 'Other',
+                    'values' => [0],
+                ],
+            ],
+            'savingGoals' => [
+                [
+                    'label' => 'Vacation',
+                    'values' => [100],
+                ],
+                [
+                    'label' => 'Crib Dream & Remodel',
+                    'values' => [100],
+                ],
+                [
+                    'label' => 'Pet',
+                    'values' => [0],
+                ],
+                [
+                    'label' => 'Dehumidifier',
+                    'values' => [50],
+                ],
+                [
+                    'label' => 'Purifier',
+                    'values' => [150],
+                ],
+                [
+                    'label' => 'Car (QoL, Maintenance)',
+                    'values' => [100],
+                ],
+            ],
+            'snapshot' => [
+                'name' => 'January 2026',
+                'captured_at' => '2026-01-09 16:10:34',
+            ],
+        ];
     }
 }

@@ -3,7 +3,7 @@
 @section('title', 'Snapshot Overview')
 
 @section('content')
-    <div x-data="cspSnapshots()" x-cloak>
+    <div class="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:py-16" x-data="cspSnapshots()" x-cloak>
 
 
         <section class="space-y-6 animate-[rise_0.8s_ease-out]">

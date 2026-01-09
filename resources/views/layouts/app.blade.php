@@ -42,7 +42,7 @@
                 </div>
             </header>
 
-            <main class="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:py-16">
+            <main>
                 @yield('content')
             </main>
         </div>

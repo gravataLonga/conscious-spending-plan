@@ -13,7 +13,15 @@ class Plan extends Model
         'currency',
         'buffer_percent',
         'user_id',
+        'is_snapshot',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_snapshot' => 'boolean',
+        ];
+    }
 
     public function user(): BelongsTo
     {

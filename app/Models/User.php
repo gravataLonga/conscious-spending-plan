@@ -49,6 +49,6 @@ class User extends Authenticatable
 
     public function plan(): HasOne
     {
-        return $this->hasOne(Plan::class);
+        return $this->hasOne(Plan::class)->where('is_snapshot', false);
     }
 }

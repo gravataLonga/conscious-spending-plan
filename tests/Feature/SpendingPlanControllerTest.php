@@ -205,7 +205,12 @@ class SpendingPlanControllerTest extends TestCase
 
         $this->assertNotNull($snapshot);
         $this->assertSame('March 2025', $snapshot->name);
-        $this->assertNotEmpty($snapshot->payload);
+        $this->assertNotNull($snapshot->snapshot_plan_id);
+
+        $snapshotPlan = Plan::find($snapshot->snapshot_plan_id);
+
+        $this->assertNotNull($snapshotPlan);
+        $this->assertTrue($snapshotPlan->is_snapshot);
 
         Carbon::setTestNow();
     }

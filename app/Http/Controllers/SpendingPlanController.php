@@ -229,7 +229,17 @@ class SpendingPlanController extends Controller
     public function snapshotSummaryData()
     {
         $plan = $this->ensurePlan();
-        $snapshots = $plan->snapshots()->reorder('captured_at')->get();
+        $snapshots = $plan->snapshots()
+            ->with([
+                'snapshotPlan.partners',
+                'snapshotPlan.netWorths',
+                'snapshotPlan.incomes',
+                'snapshotPlan.expenseCategories.entries',
+                'snapshotPlan.investingCategories.entries',
+                'snapshotPlan.savingGoalCategories.entries',
+            ])
+            ->reorder('captured_at')
+            ->get();
 
         $summaries = $snapshots->map(function (PlanSnapshot $snapshot) {
             return $this->summarizeSnapshot($snapshot);
@@ -258,25 +268,42 @@ class SpendingPlanController extends Controller
     {
         $plan = $this->ensurePlan();
 
-        $snapshot = $plan->snapshots()->whereKey($snapshot->id)->firstOrFail();
+        $snapshot = $plan->snapshots()
+            ->with([
+                'snapshotPlan.partners',
+                'snapshotPlan.netWorths',
+                'snapshotPlan.incomes',
+                'snapshotPlan.expenseCategories.entries',
+                'snapshotPlan.investingCategories.entries',
+                'snapshotPlan.savingGoalCategories.entries',
+            ])
+            ->whereKey($snapshot->id)
+            ->firstOrFail();
+
+        $snapshotPlan = $snapshot->snapshotPlan;
+        $data = $snapshotPlan ? $this->serializePlan($snapshotPlan) : ($snapshot->payload ?? []);
 
         return response()->json([
             'snapshot' => $this->serializeSnapshot($snapshot),
-            'data' => $snapshot->payload ?? [],
+            'data' => $data,
         ]);
     }
 
     public function storeSnapshot(StorePlanSnapshotRequest $request)
     {
         $plan = $this->ensurePlan();
-        $payload = $this->serializePlan($plan);
         $name = $request->validated()['name'] ?? now()->format('F Y');
 
-        $snapshot = $plan->snapshots()->create([
-            'name' => $name,
-            'captured_at' => now(),
-            'payload' => $payload,
-        ]);
+        $snapshot = DB::transaction(function () use ($plan, $name) {
+            $snapshotPlan = $this->clonePlanForSnapshot($plan);
+
+            return $plan->snapshots()->create([
+                'name' => $name,
+                'captured_at' => now(),
+                'snapshot_plan_id' => $snapshotPlan->id,
+                'payload' => [],
+            ]);
+        });
 
         return response()->json([
             'snapshot' => $this->serializeSnapshot($snapshot),
@@ -501,7 +528,9 @@ class SpendingPlanController extends Controller
 
     private function summarizeSnapshot(PlanSnapshot $snapshot): array
     {
-        $payload = $snapshot->payload ?? [];
+        $payload = $snapshot->snapshotPlan
+            ? $this->serializePlan($snapshot->snapshotPlan)
+            : ($snapshot->payload ?? []);
 
         $assets = 0.0;
         $investingTotal = 0.0;
@@ -534,6 +563,89 @@ class SpendingPlanController extends Controller
             'saving' => $savingTotal,
             'net_worth' => $netWorthTotal,
         ];
+    }
+
+    private function clonePlanForSnapshot(Plan $plan): Plan
+    {
+        $plan->loadMissing([
+            'partners',
+            'netWorths',
+            'incomes',
+            'expenseCategories.entries',
+            'investingCategories.entries',
+            'savingGoalCategories.entries',
+        ]);
+
+        $snapshotPlan = $plan->replicate();
+        $snapshotPlan->is_snapshot = true;
+        $snapshotPlan->save();
+
+        $partnerMap = [];
+
+        foreach ($plan->partners as $partner) {
+            $newPartner = $partner->replicate();
+            $newPartner->plan_id = $snapshotPlan->id;
+            $newPartner->save();
+
+            $partnerMap[$partner->id] = $newPartner->id;
+        }
+
+        foreach ($plan->netWorths as $netWorth) {
+            $newNetWorth = $netWorth->replicate();
+            $newNetWorth->plan_id = $snapshotPlan->id;
+            $newNetWorth->partner_id = $partnerMap[$netWorth->partner_id] ?? $netWorth->partner_id;
+            $newNetWorth->save();
+        }
+
+        foreach ($plan->incomes as $income) {
+            $newIncome = $income->replicate();
+            $newIncome->plan_id = $snapshotPlan->id;
+            $newIncome->partner_id = $partnerMap[$income->partner_id] ?? $income->partner_id;
+            $newIncome->save();
+        }
+
+        $this->cloneCategoriesWithEntries(
+            $snapshotPlan,
+            $plan->expenseCategories,
+            $partnerMap,
+            'expense_category_id'
+        );
+
+        $this->cloneCategoriesWithEntries(
+            $snapshotPlan,
+            $plan->investingCategories,
+            $partnerMap,
+            'investing_category_id'
+        );
+
+        $this->cloneCategoriesWithEntries(
+            $snapshotPlan,
+            $plan->savingGoalCategories,
+            $partnerMap,
+            'saving_goal_category_id'
+        );
+
+        return $snapshotPlan;
+    }
+
+    private function cloneCategoriesWithEntries(
+        Plan $snapshotPlan,
+        iterable $categories,
+        array $partnerMap,
+        string $foreignKey
+    ): void {
+        foreach ($categories as $category) {
+            $newCategory = $category->replicate();
+            $newCategory->plan_id = $snapshotPlan->id;
+            $newCategory->save();
+
+            foreach ($category->entries as $entry) {
+                $newEntry = $entry->replicate();
+                $newEntry->{$foreignKey} = $newCategory->id;
+                $newEntry->partner_id = $partnerMap[$entry->partner_id] ?? $entry->partner_id;
+                $newEntry->save();
+            }
+        }
     }
 
     /**

@@ -9,6 +9,7 @@ class PlanSnapshot extends Model
 {
     protected $fillable = [
         'plan_id',
+        'snapshot_plan_id',
         'name',
         'captured_at',
         'payload',
@@ -25,5 +26,10 @@ class PlanSnapshot extends Model
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function snapshotPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'snapshot_plan_id');
     }
 }

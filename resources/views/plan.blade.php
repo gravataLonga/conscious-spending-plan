@@ -3,7 +3,7 @@
 @section('title', 'Conscious Spending Plan')
 
 @section('content')
-    <div x-data="cspPlan()" x-cloak>
+    <div class="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:py-16" x-data="cspPlan()" x-cloak>
 
         <section class="space-y-6 animate-[rise_0.8s_ease-out]">
             <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
