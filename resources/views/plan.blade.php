@@ -1,494 +1,449 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
+@extends('layouts.app')
 
-        <title>Conscious Spending Plan</title>
+@section('title', 'Conscious Spending Plan')
 
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=space-grotesk:400,500,600,700&family=fraunces:600,700" rel="stylesheet" />
+@section('content')
+    <div x-data="cspPlan()" x-cloak>
 
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="min-h-screen bg-slate-100 text-slate-900">
-        <div class="relative overflow-hidden">
-            <div aria-hidden="true" class="pointer-events-none absolute inset-0">
-                <div class="absolute -top-32 right-[-10%] h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(59,130,246,0.18)_0%,rgba(59,130,246,0)_70%)] blur-2xl"></div>
-                <div class="absolute left-[-15%] top-40 h-80 w-80 rounded-xl bg-[radial-gradient(circle,rgba(15,23,42,0.14)_0%,rgba(15,23,42,0)_72%)] blur-2xl"></div>
-                <div class="absolute bottom-[-18%] right-10 h-72 w-72 rounded-xl bg-[radial-gradient(circle,rgba(148,163,184,0.18)_0%,rgba(148,163,184,0)_70%)] blur-2xl"></div>
+        <section class="space-y-6 animate-[rise_0.8s_ease-out]">
+            <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
+                Conscious Spending Plan
+                <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
             </div>
-
-            <header class="w-full border border-slate-200/70 bg-white/80 shadow-sm">
-                <div class="flex w-full flex-wrap items-center justify-between gap-4 px-4 py-3 text-sm font-semibold text-slate-600 md:px-8">
-                    <div class="flex items-center gap-4">
-                        <a class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700" href="{{ route('plan.show') }}">
-                            Conscious Spending Plan
-                            <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
+            <div class="grid gap-6 lg:grid-cols-[1.25fr,0.9fr]">
+                <div>
+                    <h1 class="text-4xl font-semibold leading-tight text-slate-950 md:text-5xl lg:text-6xl font-['Fraunces',serif]">
+                        Make your money plan obvious, calm, and shared.
+                    </h1>
+                    <p class="mt-4 text-base text-slate-700 md:text-lg">
+                        Track income, expenses, investing, and savings side by side. Add or remove partners as you need and keep guilt-free spending visible without digging through spreadsheets.
+                    </p>
+                    <div class="mt-6 flex flex-wrap items-center gap-4">
+                        <button
+                            class="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                            type="button"
+                            @click="savePlan"
+                            :disabled="saving"
+                        >
+                            <span x-text="saving ? 'Saving...' : 'Save Plan'"></span>
+                        </button>
+                        <button
+                            class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
+                            type="button"
+                            @click="createSnapshot"
+                            :disabled="snapshotSaving || saving"
+                        >
+                            <span x-text="snapshotSaving ? 'Creating...' : 'Create Snapshot'"></span>
+                        </button>
+                        <a
+                            class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                            href="{{ route('plan.export.csv') }}"
+                        >
+                            Export CSV
                         </a>
-                        <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.show') }}">Plans</a>
-                            <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('plan.snapshots.summary') }}">Snapshots</a>
-                        </nav>
+                        <a
+                            class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                            href="{{ route('plan.export.pdf') }}"
+                        >
+                            Export PDF
+                        </a>
+                        <span class="text-sm text-slate-500" x-text="saveNotice" x-show="saveNotice"></span>
+                        <span class="text-sm text-slate-500" x-text="snapshotNotice" x-show="snapshotNotice"></span>
+                        <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>
                     </div>
-                    <nav class="flex flex-wrap items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                        <a class="text-slate-600 transition hover:text-slate-900" href="{{ route('account.edit') }}">Profile</a>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button class="text-slate-600 transition hover:text-slate-900" type="submit">Logout</button>
-                        </form>
-                    </nav>
                 </div>
-            </header>
+                <div class="rounded-lg border border-slate-200/70 bg-white/80 p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h2 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Partner Labels</h2>
+                        <button
+                            class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                            type="button"
+                            @click="addPartner"
+                        >
+                            Add Partner
+                        </button>
+                    </div>
+                    <div class="mt-4 grid gap-4">
+                        <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                            <label class="text-sm font-medium text-slate-700">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span x-text="`Partner ${index + 1}`"></span>
+                                    <button
+                                        class="inline-flex items-center gap-1 rounded-md border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-rose-600 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:border-rose-100 disabled:bg-rose-50/40 disabled:text-rose-300"
+                                        type="button"
+                                        @click="removePartner(index)"
+                                        :disabled="partners.length <= 1"
+                                        aria-label="Remove partner"
+                                    >
+                                        <x-heroicon-o-trash class="h-3 w-3" />
+                                        <span>Remove</span>
+                                    </button>
+                                </div>
+                                <input
+                                    class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
+                                    type="text"
+                                    x-model="partners[index].name"
+                                    :placeholder="`Partner ${index + 1}`"
+                                />
+                            </label>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-            <main
-                class="relative mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 md:py-16"
-                x-data="cspPlan()"
-                x-cloak
-            >
+        <section class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Net Income</p>
+                <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalIncomeNet())"></p>
+                <p class="mt-1 text-xs text-slate-500" x-text="formatCurrency(totalIncomeGross()) + ' gross'"></p>
+            </div>
+            <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Expenses</p>
+                <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalExpenses())"></p>
+                <p class="mt-1 text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
+                ></p>
+            </div>
+            <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Investing + Saving</p>
+                <p
+                    class="mt-3 text-2xl font-semibold text-slate-900"
+                    x-text="formatCurrency(totalInvesting() + totalSavingGoals())"
+                ></p>
+                <p
+                    class="mt-1 text-xs text-slate-500"
+                    x-text="formatPercent(shareOfIncome(totalInvesting() + totalSavingGoals(), totalIncomeNet())) + ' of net income'"
+                ></p>
+            </div>
+            <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Guilt-Free</p>
+                <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></p>
+                <p class="mt-1 text-xs text-slate-500">Available after goals.</p>
+            </div>
+        </section>
 
-                <section class="space-y-6 animate-[rise_0.8s_ease-out]">
-                    <div class="inline-flex items-center gap-2 rounded-md border border-slate-200/80 bg-white/80 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700">
-                        Conscious Spending Plan
-                        <span class="inline-flex h-1.5 w-1.5 rounded-sm bg-slate-500"></span>
-                    </div>
-                    <div class="grid gap-6 lg:grid-cols-[1.25fr,0.9fr]">
-                        <div>
-                            <h1 class="text-4xl font-semibold leading-tight text-slate-950 md:text-5xl lg:text-6xl font-['Fraunces',serif]">
-                                Make your money plan obvious, calm, and shared.
-                            </h1>
-                            <p class="mt-4 text-base text-slate-700 md:text-lg">
-                                Track income, expenses, investing, and savings side by side. Add or remove partners as you need and keep guilt-free spending visible without digging through spreadsheets.
-                            </p>
-                            <div class="mt-6 flex flex-wrap items-center gap-4">
-                                <button
-                                    class="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-                                    type="button"
-                                    @click="savePlan"
-                                    :disabled="saving"
-                                >
-                                    <span x-text="saving ? 'Saving...' : 'Save Plan'"></span>
-                                </button>
-                                <button
-                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
-                                    type="button"
-                                    @click="createSnapshot"
-                                    :disabled="snapshotSaving || saving"
-                                >
-                                    <span x-text="snapshotSaving ? 'Creating...' : 'Create Snapshot'"></span>
-                                </button>
-                                <a
-                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-                                    href="{{ route('plan.export.csv') }}"
-                                >
-                                    Export CSV
-                                </a>
-                                <a
-                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
-                                    href="{{ route('plan.export.pdf') }}"
-                                >
-                                    Export PDF
-                                </a>
-                                <span class="text-sm text-slate-500" x-text="saveNotice" x-show="saveNotice"></span>
-                                <span class="text-sm text-slate-500" x-text="snapshotNotice" x-show="snapshotNotice"></span>
-                                <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>
-                            </div>
-                        </div>
-                        <div class="rounded-lg border border-slate-200/70 bg-white/80 p-5 shadow-sm">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <h2 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Partner Labels</h2>
-                                <button
-                                    class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
-                                    type="button"
-                                    @click="addPartner"
-                                >
-                                    Add Partner
-                                </button>
-                            </div>
-                            <div class="mt-4 grid gap-4">
-                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                    <label class="text-sm font-medium text-slate-700">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span x-text="`Partner ${index + 1}`"></span>
-                                            <button
-                                                class="inline-flex items-center gap-1 rounded-md border border-rose-200/70 bg-rose-50 px-1.5 py-0.5 text-[0.55rem] font-semibold uppercase tracking-[0.18em] text-rose-600 transition hover:border-rose-300 hover:text-rose-700 disabled:cursor-not-allowed disabled:border-rose-100 disabled:bg-rose-50/40 disabled:text-rose-300"
-                                                type="button"
-                                                @click="removePartner(index)"
-                                                :disabled="partners.length <= 1"
-                                                aria-label="Remove partner"
-                                            >
-                                                <x-heroicon-o-trash class="h-3 w-3" />
-                                                <span>Remove</span>
-                                            </button>
-                                        </div>
-                                        <input
-                                            class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
-                                            type="text"
-                                            x-model="partners[index].name"
-                                            :placeholder="`Partner ${index + 1}`"
-                                        />
-                                    </label>
-                                </template>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Net Worth Snapshot</h2>
+                    <p class="text-sm text-slate-500">Assets + Invested + Saving - Debt</p>
+                </div>
+                <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <span x-text="partnerName(index) + ': ' + formatCurrency(netWorthTotal(index))"></span>
+                    </template>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-3">
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Assets</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="netWorth.assets[index]" />
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Invested</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="netWorth.invested[index]" />
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Saving</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="netWorth.saving[index]" />
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Debt</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="netWorth.debt[index]" />
+                    </template>
+                </div>
+            </div>
+        </section>
 
-                <section class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Net Income</p>
-                        <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalIncomeNet())"></p>
-                        <p class="mt-1 text-xs text-slate-500" x-text="formatCurrency(totalIncomeGross()) + ' gross'"></p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Total Expenses</p>
-                        <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(totalExpenses())"></p>
-                        <p class="mt-1 text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
-                        ></p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Investing + Saving</p>
-                        <p
-                            class="mt-3 text-2xl font-semibold text-slate-900"
-                            x-text="formatCurrency(totalInvesting() + totalSavingGoals())"
-                        ></p>
-                        <p
-                            class="mt-1 text-xs text-slate-500"
-                            x-text="formatPercent(shareOfIncome(totalInvesting() + totalSavingGoals(), totalIncomeNet())) + ' of net income'"
-                        ></p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200/70 bg-white/80 p-4 shadow-sm">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Guilt-Free</p>
-                        <p class="mt-3 text-2xl font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></p>
-                        <p class="mt-1 text-xs text-slate-500">Available after goals.</p>
-                    </div>
-                </section>
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Income</h2>
+                    <p class="text-sm text-slate-500">Use net income for plan calculations, and track gross for visibility.</p>
+                </div>
+                <div class="flex gap-6 text-sm font-semibold text-slate-700">
+                    <span x-text="'Net: ' + formatCurrency(totalIncomeNet())"></span>
+                    <span x-text="'Gross: ' + formatCurrency(totalIncomeGross())"></span>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-3">
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Net Income (Annual)</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="income.net[index]" />
+                    </template>
+                </div>
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-medium text-slate-800">Gross Income (Annual)</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <input class="input-field" type="number" step="0.01" x-model.number="income.gross[index]" />
+                    </template>
+                </div>
+            </div>
+        </section>
 
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Net Worth Snapshot</h2>
-                            <p class="text-sm text-slate-500">Assets + Invested + Saving - Debt</p>
-                        </div>
-                        <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <span x-text="partnerName(index) + ': ' + formatCurrency(netWorthTotal(index))"></span>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="mt-6 grid gap-3">
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Assets</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.assets[index]" />
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Invested</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.invested[index]" />
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Saving</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.saving[index]" />
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Debt</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.debt[index]" />
-                            </template>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Income</h2>
-                            <p class="text-sm text-slate-500">Use net income for plan calculations, and track gross for visibility.</p>
-                        </div>
-                        <div class="flex gap-6 text-sm font-semibold text-slate-700">
-                            <span x-text="'Net: ' + formatCurrency(totalIncomeNet())"></span>
-                            <span x-text="'Gross: ' + formatCurrency(totalIncomeGross())"></span>
-                        </div>
-                    </div>
-                    <div class="mt-6 grid gap-3">
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Net Income (Annual)</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="income.net[index]" />
-                            </template>
-                        </div>
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-sm font-medium text-slate-800">Gross Income (Annual)</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <input class="input-field" type="number" step="0.01" x-model.number="income.gross[index]" />
-                            </template>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Total Expenses</h2>
-                            <p class="text-sm text-slate-500">Buffer adds a percentage above expenses to keep space for surprises.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
-                            <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
-                                <span x-text="formatCurrency(totalExpenses())"></span>
-                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
-                                ></span>
-                            </div>
-                            <button
-                                class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
-                                type="button"
-                                @click="addExpense"
-                            >
-                                Add Expense
-                            </button>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <span class="font-semibold">Buffer</span>
-                        <label class="flex items-center gap-2">
-                            <input class="h-8 w-20 rounded-md border border-slate-200 bg-white px-2" type="number" step="1" x-model.number="bufferPercent" />
-                            <span>% of subtotal</span>
-                        </label>
-                        <span class="text-xs text-slate-500" x-text="'Adds ' + formatCurrency(expensesBuffer()) + ' total'"
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Total Expenses</h2>
+                    <p class="text-sm text-slate-500">Buffer adds a percentage above expenses to keep space for surprises.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                    <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span x-text="formatCurrency(totalExpenses())"></span>
+                        <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
                         ></span>
                     </div>
-                    <div class="mt-6 grid gap-3">
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
-                            </template>
-                            <div></div>
-                        </div>
-                        <template x-for="(expense, index) in expenses" :key="categoryKey(expense, index)">
-                            <div
-                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                                :style="partnerColumnsStyle()"
-                            >
-                                <input class="input-field" type="text" x-model="expense.label" />
-                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                    <input class="input-field" type="number" step="0.01" x-model.number="expense.values[index]" />
-                                </template>
-                                <button
-                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
-                                    type="button"
-                                    @click="removeExpense(index)"
-                                    aria-label="Remove expense"
-                                >
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                        type="button"
+                        @click="addExpense"
+                    >
+                        Add Expense
+                    </button>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <span class="font-semibold">Buffer</span>
+                <label class="flex items-center gap-2">
+                    <input class="h-8 w-20 rounded-md border border-slate-200 bg-white px-2" type="number" step="1" x-model.number="bufferPercent" />
+                    <span>% of subtotal</span>
+                </label>
+                <span class="text-xs text-slate-500" x-text="'Adds ' + formatCurrency(expensesBuffer()) + ' total'"
+                ></span>
+            </div>
+            <div class="mt-6 grid gap-3">
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                    </template>
+                    <div></div>
+                </div>
+                <template x-for="(expense, index) in expenses" :key="categoryKey(expense, index)">
+                    <div
+                        class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                        :style="partnerColumnsStyle()"
+                    >
+                        <input class="input-field" type="text" x-model="expense.label" />
+                        <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                            <input class="input-field" type="number" step="0.01" x-model.number="expense.values[index]" />
                         </template>
-                        <div
-                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
+                        <button
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
+                            type="button"
+                            @click="removeExpense(index)"
+                            aria-label="Remove expense"
                         >
-                            <div class="text-sm font-semibold text-slate-900">Subtotal + Buffer</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalExpenses(index))"></div>
-                            </template>
-                            <div></div>
-                        </div>
+                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        </button>
                     </div>
-                </section>
+                </template>
+                <div
+                    class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-semibold text-slate-900">Subtotal + Buffer</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalExpenses(index))"></div>
+                    </template>
+                    <div></div>
+                </div>
+            </div>
+        </section>
 
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Investing</h2>
-                            <p class="text-sm text-slate-500">Percent of net income shown for focus.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
-                            <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
-                                <span x-text="formatCurrency(totalInvesting())"></span>
-                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalInvesting(), totalIncomeNet())) + ' of net income'"
-                                ></span>
-                            </div>
-                            <button
-                                class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
-                                type="button"
-                                @click="addInvesting"
-                            >
-                                Add Investing
-                            </button>
-                        </div>
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Investing</h2>
+                    <p class="text-sm text-slate-500">Percent of net income shown for focus.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                    <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span x-text="formatCurrency(totalInvesting())"></span>
+                        <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalInvesting(), totalIncomeNet())) + ' of net income'"
+                        ></span>
                     </div>
-                    <div class="mt-6 grid gap-3">
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
-                            </template>
-                            <div></div>
-                        </div>
-                        <template x-for="(item, index) in investing" :key="categoryKey(item, index)">
-                            <div
-                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                                :style="partnerColumnsStyle()"
-                            >
-                                <input class="input-field" type="text" x-model="item.label" />
-                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                    <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
-                                </template>
-                                <button
-                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
-                                    type="button"
-                                    @click="removeInvesting(index)"
-                                    aria-label="Remove investing"
-                                >
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                        type="button"
+                        @click="addInvesting"
+                    >
+                        Add Investing
+                    </button>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-3">
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                    </template>
+                    <div></div>
+                </div>
+                <template x-for="(item, index) in investing" :key="categoryKey(item, index)">
+                    <div
+                        class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                        :style="partnerColumnsStyle()"
+                    >
+                        <input class="input-field" type="text" x-model="item.label" />
+                        <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                            <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
                         </template>
-                        <div
-                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
+                        <button
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
+                            type="button"
+                            @click="removeInvesting(index)"
+                            aria-label="Remove investing"
                         >
-                            <div class="text-sm font-semibold text-slate-900">Total Investing</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalInvesting(index))"></div>
-                            </template>
-                            <div></div>
-                        </div>
+                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        </button>
                     </div>
-                </section>
+                </template>
+                <div
+                    class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-semibold text-slate-900">Total Investing</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalInvesting(index))"></div>
+                    </template>
+                    <div></div>
+                </div>
+            </div>
+        </section>
 
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Saving Goals</h2>
-                            <p class="text-sm text-slate-500">Keep intentional goals in sight.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
-                            <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
-                                <span x-text="formatCurrency(totalSavingGoals())"></span>
-                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalSavingGoals(), totalIncomeNet())) + ' of net income'"
-                                ></span>
-                            </div>
-                            <button
-                                class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
-                                type="button"
-                                @click="addSavingGoal"
-                            >
-                                Add Saving Goal
-                            </button>
-                        </div>
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Saving Goals</h2>
+                    <p class="text-sm text-slate-500">Keep intentional goals in sight.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                    <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-700">
+                        <span x-text="formatCurrency(totalSavingGoals())"></span>
+                        <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalSavingGoals(), totalIncomeNet())) + ' of net income'"
+                        ></span>
                     </div>
-                    <div class="mt-6 grid gap-3">
-                        <div
-                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
-                        >
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
-                            </template>
-                            <div></div>
-                        </div>
-                        <template x-for="(item, index) in savingGoals" :key="categoryKey(item, index)">
-                            <div
-                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                                :style="partnerColumnsStyle()"
-                            >
-                                <input class="input-field" type="text" x-model="item.label" />
-                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                    <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
-                                </template>
-                                <button
-                                    class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
-                                    type="button"
-                                    @click="removeSavingGoal(index)"
-                                    aria-label="Remove saving goal"
-                                >
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
-                                </button>
-                            </div>
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border border-emerald-200/70 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 transition hover:border-emerald-300 hover:text-emerald-800"
+                        type="button"
+                        @click="addSavingGoal"
+                    >
+                        Add Saving Goal
+                    </button>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-3">
+                <div
+                    class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                    </template>
+                    <div></div>
+                </div>
+                <template x-for="(item, index) in savingGoals" :key="categoryKey(item, index)">
+                    <div
+                        class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                        :style="partnerColumnsStyle()"
+                    >
+                        <input class="input-field" type="text" x-model="item.label" />
+                        <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                            <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
                         </template>
-                        <div
-                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
-                            :style="partnerColumnsStyle()"
+                        <button
+                            class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-200/70 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:text-rose-700"
+                            type="button"
+                            @click="removeSavingGoal(index)"
+                            aria-label="Remove saving goal"
                         >
-                            <div class="text-sm font-semibold text-slate-900">Total Saving Goals</div>
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalSavingGoals(index))"></div>
-                            </template>
-                            <div></div>
-                        </div>
+                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        </button>
                     </div>
-                </section>
+                </template>
+                <div
+                    class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))_minmax(24px,0.1fr)]"
+                    :style="partnerColumnsStyle()"
+                >
+                    <div class="text-sm font-semibold text-slate-900">Total Saving Goals</div>
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalSavingGoals(index))"></div>
+                    </template>
+                    <div></div>
+                </div>
+            </div>
+        </section>
 
-                <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h2 class="text-xl font-semibold text-slate-900">Guilt-Free Spending</h2>
-                            <p class="text-sm text-slate-500">What remains after essentials, investing, and savings.</p>
-                        </div>
-                        <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
-                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
-                                <span x-text="partnerName(index) + ': ' + formatCurrency(guiltyFreeSpending(index))"></span>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="mt-6 grid gap-3 rounded-lg border border-slate-200/70 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <span>Total guilt-free spending (combined)</span>
-                            <span class="text-base font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></span>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
-    </body>
-</html>
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">Guilt-Free Spending</h2>
+                    <p class="text-sm text-slate-500">What remains after essentials, investing, and savings.</p>
+                </div>
+                <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
+                    <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                        <span x-text="partnerName(index) + ': ' + formatCurrency(guiltyFreeSpending(index))"></span>
+                    </template>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-3 rounded-lg border border-slate-200/70 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <span>Total guilt-free spending (combined)</span>
+                    <span class="text-base font-semibold text-slate-900" x-text="formatCurrency(guiltyFreeSpending())"></span>
+                </div>
+            </div>
+        </section>
+    </div>
+@endsection

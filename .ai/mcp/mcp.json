@@ -3,7 +3,7 @@
     "laravel-boost": {
       "command": "/opt/homebrew/Cellar/php@8.4/8.4.15/bin/php",
       "args": [
-        "/Users/jfontes/Sites/csp/artisan",
+        "/Users/jfontes/Sites/csp--ui-and-ux/artisan",
         "boost:mcp"
       ]
     }
