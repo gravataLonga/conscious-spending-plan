@@ -44,7 +44,7 @@ class SpendingPlanController extends Controller
 
     public function show()
     {
-        return view('welcome');
+        return view('plan');
     }
 
     public function data()
@@ -164,7 +164,7 @@ class SpendingPlanController extends Controller
                 $partner->update(['name' => $name ?: $partner->name]);
             } else {
                 $partner = $plan->partners()->create([
-                    'name' => $name ?: 'Partner ' . ($index + 1),
+                    'name' => $name ?: 'Partner '.($index + 1),
                 ]);
             }
 

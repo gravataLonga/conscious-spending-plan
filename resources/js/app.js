@@ -320,7 +320,7 @@ window.cspPlan = function () {
         async fetchPlan() {
             this.loading = true;
             try {
-                const response = await window.axios.get('/plan');
+                const response = await window.axios.get('/plan/data');
                 this.applyPlan(response.data);
             } catch (error) {
                 console.error(error);
