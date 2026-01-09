@@ -12,9 +12,12 @@ use App\Models\Partner;
 use App\Models\Plan;
 use App\Models\SavingGoalCategory;
 use App\Models\SavingGoalEntry;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SpendingPlanController extends Controller
 {
@@ -126,6 +129,115 @@ class SpendingPlanController extends Controller
         $plan->refresh();
 
         return response()->json($this->serializePlan($plan));
+    }
+
+    public function exportCsv(): StreamedResponse
+    {
+        $plan = $this->ensurePlan();
+        $planData = $this->serializePlan($plan);
+        $partners = collect($planData['partners'])->pluck('name')->all();
+        $partnerCount = count($partners);
+
+        $filename = 'conscious-spending-plan-'.now()->format('Y-m-d').'.csv';
+
+        return response()->streamDownload(function () use ($planData, $partners, $partnerCount) {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, array_merge(['Section', 'Category'], $partners));
+
+            $planRows = [
+                [
+                    'label' => 'Buffer Percent',
+                    'values' => [(float) ($planData['plan']['buffer_percent'] ?? 0)],
+                ],
+                [
+                    'label' => 'Currency',
+                    'values' => [$planData['plan']['currency'] ?? ''],
+                ],
+            ];
+            $this->writeCsvSection($handle, 'Plan', $planRows, $partnerCount);
+
+            $netWorthRows = [
+                [
+                    'label' => 'Assets',
+                    'values' => array_column($planData['netWorth'], 'assets'),
+                ],
+                [
+                    'label' => 'Invested',
+                    'values' => array_column($planData['netWorth'], 'invested'),
+                ],
+                [
+                    'label' => 'Saving',
+                    'values' => array_column($planData['netWorth'], 'saving'),
+                ],
+                [
+                    'label' => 'Debt',
+                    'values' => array_column($planData['netWorth'], 'debt'),
+                ],
+            ];
+            $this->writeCsvSection($handle, 'Net Worth', $netWorthRows, $partnerCount);
+
+            $incomeRows = [
+                [
+                    'label' => 'Net Income (Annual)',
+                    'values' => array_column($planData['income'], 'net'),
+                ],
+                [
+                    'label' => 'Gross Income (Annual)',
+                    'values' => array_column($planData['income'], 'gross'),
+                ],
+            ];
+            $this->writeCsvSection($handle, 'Income', $incomeRows, $partnerCount);
+
+            $expenseRows = collect($planData['expenses'])
+                ->map(fn (array $category) => [
+                    'label' => $category['label'],
+                    'values' => $category['values'],
+                ])
+                ->all();
+            $this->writeCsvSection($handle, 'Expenses', $expenseRows, $partnerCount);
+
+            $investingRows = collect($planData['investing'])
+                ->map(fn (array $category) => [
+                    'label' => $category['label'],
+                    'values' => $category['values'],
+                ])
+                ->all();
+            $this->writeCsvSection($handle, 'Investing', $investingRows, $partnerCount);
+
+            $savingRows = collect($planData['savingGoals'])
+                ->map(fn (array $category) => [
+                    'label' => $category['label'],
+                    'values' => $category['values'],
+                ])
+                ->all();
+            $this->writeCsvSection($handle, 'Saving Goals', $savingRows, $partnerCount);
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    public function exportPdf(): Response
+    {
+        $plan = $this->ensurePlan();
+        $planData = $this->serializePlan($plan);
+
+        $pdf = Pdf::loadView('exports.plan-pdf', [
+            'plan' => $planData['plan'],
+            'partners' => $planData['partners'],
+            'netWorth' => $planData['netWorth'],
+            'income' => $planData['income'],
+            'expenses' => $planData['expenses'],
+            'investing' => $planData['investing'],
+            'savingGoals' => $planData['savingGoals'],
+            'exportedAt' => now()->format('M j, Y'),
+        ])->setPaper('letter');
+
+        $filename = 'conscious-spending-plan-'.now()->format('Y-m-d').'.pdf';
+
+        return $pdf->download($filename);
     }
 
     private function ensurePlan(): Plan
@@ -316,5 +428,19 @@ class SpendingPlanController extends Controller
                 ];
             })->values()->all(),
         ];
+    }
+
+    /**
+     * @param  resource  $handle
+     * @param  array<int, array{label: string, values: array<int, float|string|null>}>  $rows
+     */
+    private function writeCsvSection($handle, string $section, array $rows, int $partnerCount): void
+    {
+        foreach ($rows as $row) {
+            $values = array_values($row['values']);
+            $values = array_pad($values, $partnerCount, '');
+
+            fputcsv($handle, array_merge([$section, $row['label']], $values));
+        }
     }
 }

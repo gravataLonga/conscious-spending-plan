@@ -61,6 +61,18 @@
                                 >
                                     <span x-text="saving ? 'Saving...' : 'Save Plan'"></span>
                                 </button>
+                                <a
+                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                                    href="{{ route('plan.export.csv') }}"
+                                >
+                                    Export CSV
+                                </a>
+                                <a
+                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900"
+                                    href="{{ route('plan.export.pdf') }}"
+                                >
+                                    Export PDF
+                                </a>
                                 <span class="text-sm text-slate-500" x-text="saveNotice" x-show="saveNotice"></span>
                                 <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>
                             </div>
