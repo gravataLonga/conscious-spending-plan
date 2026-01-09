@@ -30,7 +30,7 @@ class SpendingPlanControllerTest extends TestCase
 
     public function test_it_returns_default_plan_payload(): void
     {
-        $this->signIn();
+        $user = $this->signIn();
 
         $response = $this->getJson(route('plan.data'));
 
@@ -47,12 +47,13 @@ class SpendingPlanControllerTest extends TestCase
         $this->assertCount(2, $data['expenses'][0]['values']);
 
         $this->assertSame(1, Plan::count());
+        $this->assertSame($user->id, Plan::first()->user_id);
         $this->assertSame(2, Partner::count());
     }
 
     public function test_it_persists_plan_updates(): void
     {
-        $this->signIn();
+        $user = $this->signIn();
 
         $payload = $this->getJson(route('plan.data'))->json();
 
@@ -114,7 +115,7 @@ class SpendingPlanControllerTest extends TestCase
 
         $this->postJson(route('plan.store'), $storePayload)->assertOk();
 
-        $plan = Plan::first();
+        $plan = Plan::where('user_id', $user->id)->firstOrFail();
         $partners = Partner::orderBy('id')->get();
 
         $this->assertSame(10.0, (float) $plan->buffer_percent);
@@ -220,5 +221,62 @@ class SpendingPlanControllerTest extends TestCase
 
         $response->assertOk();
         $this->assertCount(2, $response->json('snapshots'));
+    }
+
+    public function test_it_does_not_allow_accessing_another_users_snapshot(): void
+    {
+        $this->signIn();
+        $ownerSnapshotResponse = $this->postJson(route('plan.snapshots.store'));
+        $ownerSnapshotResponse->assertCreated();
+        $snapshotId = $ownerSnapshotResponse->json('snapshot.id');
+
+        $this->actingAs(User::factory()->create());
+
+        $this->getJson(route('plan.snapshots.show', ['snapshot' => $snapshotId]))
+            ->assertNotFound();
+    }
+
+    public function test_it_requires_authentication_for_plan_endpoints(): void
+    {
+        $this->getJson(route('plan.data'))->assertUnauthorized();
+        $this->postJson(route('plan.store'))->assertUnauthorized();
+    }
+
+    public function test_it_requires_authentication_for_snapshot_endpoints(): void
+    {
+        $this->getJson(route('plan.snapshots'))->assertUnauthorized();
+        $this->postJson(route('plan.snapshots.store'))->assertUnauthorized();
+        $this->getJson(route('plan.snapshots.show', ['snapshot' => 1]))->assertUnauthorized();
+    }
+
+    public function test_it_sanitizes_csv_formula_injection(): void
+    {
+        $this->signIn();
+
+        $payload = $this->getJson(route('plan.data'))->json();
+        $expenseCategoryId = $payload['expenses'][0]['id'];
+
+        $this->postJson(route('plan.store'), [
+            'partners' => [
+                ['name' => '=HYPERLINK("http://evil.test")'],
+                ['name' => '+SUM(1,1)'],
+            ],
+            'expenses' => [
+                [
+                    'id' => $expenseCategoryId,
+                    'label' => '-cmd',
+                    'values' => [100, 200],
+                ],
+            ],
+        ])->assertOk();
+
+        $response = $this->get(route('plan.export.csv'));
+        $response->assertOk();
+
+        $csv = $response->streamedContent();
+
+        $this->assertStringContainsString("'=HYPERLINK(\"\"http://evil.test\"\")", $csv);
+        $this->assertStringContainsString("'+SUM(1,1)", $csv);
+        $this->assertStringContainsString("'-cmd", $csv);
     }
 }

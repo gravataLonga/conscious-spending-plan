@@ -150,7 +150,9 @@ class SpendingPlanController extends Controller
         return response()->streamDownload(function () use ($planData, $partners, $partnerCount) {
             $handle = fopen('php://output', 'w');
 
-            fputcsv($handle, array_merge(['Section', 'Category'], $partners));
+            $headers = array_merge(['Section', 'Category'], $partners);
+            $headers = array_map(fn ($value) => $this->sanitizeCsvValue($value), $headers);
+            fputcsv($handle, $headers);
 
             $planRows = [
                 [
@@ -284,9 +286,7 @@ class SpendingPlanController extends Controller
     {
         $plan = $this->ensurePlan();
 
-        if ($snapshot->plan_id !== $plan->id) {
-            abort(404);
-        }
+        $snapshot = $plan->snapshots()->whereKey($snapshot->id)->firstOrFail();
 
         return response()->json([
             'snapshot' => $this->serializeSnapshot($snapshot),
@@ -313,10 +313,15 @@ class SpendingPlanController extends Controller
 
     private function ensurePlan(): Plan
     {
-        $plan = Plan::first();
+        $user = request()->user();
+        if (! $user) {
+            abort(401);
+        }
+
+        $plan = $user->plan()->first();
 
         if (! $plan) {
-            $plan = Plan::create(['name' => 'Default Plan']);
+            $plan = $user->plan()->create(['name' => 'Default Plan']);
         }
 
         $this->ensureCategories($plan, ExpenseCategory::class, self::DEFAULT_EXPENSES);
@@ -584,8 +589,30 @@ class SpendingPlanController extends Controller
         foreach ($rows as $row) {
             $values = array_values($row['values']);
             $values = array_pad($values, $partnerCount, '');
+            $values = array_map(fn ($value) => $this->sanitizeCsvValue($value), $values);
 
-            fputcsv($handle, array_merge([$section, $row['label']], $values));
+            $sectionValue = $this->sanitizeCsvValue($section);
+            $labelValue = $this->sanitizeCsvValue($row['label']);
+
+            fputcsv($handle, array_merge([$sectionValue, $labelValue], $values));
         }
+    }
+
+    private function sanitizeCsvValue(mixed $value): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        $trimmed = ltrim($value);
+        if ($trimmed === '') {
+            return $value;
+        }
+
+        if (preg_match('/^[=+\-@]/', $trimmed) !== 1) {
+            return $value;
+        }
+
+        return "'".$value;
     }
 }
