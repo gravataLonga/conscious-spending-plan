@@ -1,59 +1,208 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Conscious Spending Plan
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel app that implements Ramit Sethi's Conscious Spending Plan as a shared, side-by-side money table for one or more partners. It captures net worth, income, expenses, investing, and saving goals, then calculates totals and the remaining guilt-free spending.
 
-## About Laravel
+## What the app does
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Builds a single plan per user with default categories and partner labels.
+- Lets you rename partners, add/remove partners, and add/remove categories.
+- Captures net worth (assets, invested, saving, debt) per partner.
+- Captures net and gross annual income per partner.
+- Tracks expenses, investing, and saving goals per partner.
+- Applies an adjustable expense buffer percentage (default 15%).
+- Computes totals, net-worth rollups, and guilt-free spending.
+- Shows category totals as a share of net income.
+- Saves everything to the database and reloads it on visit.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Core sections and defaults
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Net Worth: Assets + Invested + Saving - Debt.
+- Income: Net and gross annual income per partner.
+- Expenses (default categories):
+  - Rent or Mortgage
+  - Utilities
+  - Insurance
+  - Car Payment
+  - Groceries
+  - Clothes
+  - Phone
+  - Subscriptions
+  - Debt
+- Investing (default categories):
+  - Post-tax Retirement Saving
+  - ETF
+  - Other
+- Saving Goals (default categories):
+  - Vacation
+  - Gifts
+  - Long Term Emergency Fund
+- Guilt-Free Spending: net income minus expenses, investing, and saving goals.
 
-## Learning Laravel
+## Calculations and behavior
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- Net worth per partner = assets + invested + saving - debt.
+- Net income total = sum of partner net income (gross total is tracked separately).
+- Expenses total = sum of expense categories + buffer percent.
+- Investing total and saving total are summed per partner and overall.
+- Guilt-free spending = net income - expenses - investing - saving goals.
+- Percent-of-income figures are based on total net income.
+- Category labels and partner names are editable; empty names fall back to defaults.
+- Currency is stored on the plan (default `USD`); UI formatting currently uses `USD`.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Snapshots and trends
 
-## Laravel Sponsors
+- Create snapshots of the current plan state.
+- Snapshot data is stored as a JSON payload with a captured timestamp.
+- Snapshot summary page shows latest totals and deltas vs previous snapshots.
+- A time-series chart tracks assets, expenses, investing, and saving over time.
+- Date range filters narrow the snapshot history and chart.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Exports
 
-### Premium Partners
+- Export the plan as CSV.
+- Export the plan as PDF (via DomPDF) with the current buffer percent and currency.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Accounts and auth
 
-## Contributing
+- Fortify-backed registration, login, password reset, and password confirmation.
+- Profile page to update name/email and password.
+- All plan and snapshot routes require authentication.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Data model (high level)
 
-## Code of Conduct
+- `Plan`: name, currency, buffer percent, belongs to user.
+- `Partner`: partner label(s) for the plan.
+- `NetWorth`: assets, invested, saving, debt per partner.
+- `Income`: net and gross income per partner.
+- `ExpenseCategory` + `ExpenseEntry`: expense labels + amounts per partner.
+- `InvestingCategory` + `InvestingEntry`: investing labels + amounts per partner.
+- `SavingGoalCategory` + `SavingGoalEntry`: saving goal labels + amounts per partner.
+- `PlanSnapshot`: captured payload of the full plan.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Database diagram
 
-## Security Vulnerabilities
+```mermaid
+erDiagram
+    USERS ||--o{ PLANS : has
+    PLANS ||--o{ PARTNERS : has
+    PLANS ||--o{ NET_WORTHS : has
+    PLANS ||--o{ INCOMES : has
+    PLANS ||--o{ EXPENSE_CATEGORIES : has
+    PLANS ||--o{ INVESTING_CATEGORIES : has
+    PLANS ||--o{ SAVING_GOAL_CATEGORIES : has
+    PLANS ||--o{ PLAN_SNAPSHOTS : has
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    PARTNERS ||--o{ NET_WORTHS : has
+    PARTNERS ||--o{ INCOMES : has
+    PARTNERS ||--o{ EXPENSE_ENTRIES : has
+    PARTNERS ||--o{ INVESTING_ENTRIES : has
+    PARTNERS ||--o{ SAVING_GOAL_ENTRIES : has
 
-## License
+    EXPENSE_CATEGORIES ||--o{ EXPENSE_ENTRIES : has
+    INVESTING_CATEGORIES ||--o{ INVESTING_ENTRIES : has
+    SAVING_GOAL_CATEGORIES ||--o{ SAVING_GOAL_ENTRIES : has
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+    USERS {
+        bigint id PK
+        string name
+        string email
+    }
+
+    PLANS {
+        bigint id PK
+        bigint user_id FK
+        string name
+        string currency
+        decimal buffer_percent
+    }
+
+    PARTNERS {
+        bigint id PK
+        bigint plan_id FK
+        string name
+    }
+
+    NET_WORTHS {
+        bigint id PK
+        bigint plan_id FK
+        bigint partner_id FK
+        decimal assets
+        decimal invested
+        decimal saving
+        decimal debt
+    }
+
+    INCOMES {
+        bigint id PK
+        bigint plan_id FK
+        bigint partner_id FK
+        decimal net
+        decimal gross
+    }
+
+    EXPENSE_CATEGORIES {
+        bigint id PK
+        bigint plan_id FK
+        string name
+        int sort
+    }
+
+    EXPENSE_ENTRIES {
+        bigint id PK
+        bigint expense_category_id FK
+        bigint partner_id FK
+        decimal amount
+    }
+
+    INVESTING_CATEGORIES {
+        bigint id PK
+        bigint plan_id FK
+        string name
+        int sort
+    }
+
+    INVESTING_ENTRIES {
+        bigint id PK
+        bigint investing_category_id FK
+        bigint partner_id FK
+        decimal amount
+    }
+
+    SAVING_GOAL_CATEGORIES {
+        bigint id PK
+        bigint plan_id FK
+        string name
+        int sort
+    }
+
+    SAVING_GOAL_ENTRIES {
+        bigint id PK
+        bigint saving_goal_category_id FK
+        bigint partner_id FK
+        decimal amount
+    }
+
+    PLAN_SNAPSHOTS {
+        bigint id PK
+        bigint plan_id FK
+        string name
+        datetime captured_at
+        json payload
+    }
+```
+
+## Tech stack
+
+- Laravel 12 + Fortify authentication
+- Alpine.js + Tailwind CSS v4 (Vite)
+- Lightweight Charts for snapshot trends
+- DomPDF for PDF exports
+- Blade UI Kit Heroicons for icons
+
+## Local development
+
+- `composer run setup` - install deps, create `.env`, migrate, build assets.
+- `composer run dev` - run PHP server, queue worker, logs, and Vite.
+- `npm run dev` - run Vite in watch mode.
+- `npm run build` - build production assets.
+- `composer run test` - run the Laravel test suite.
