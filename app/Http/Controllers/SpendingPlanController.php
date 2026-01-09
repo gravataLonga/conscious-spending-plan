@@ -64,13 +64,8 @@ class SpendingPlanController extends Controller
                 $plan->update(['buffer_percent' => (float) $bufferPercent]);
             }
 
-            $partners = $this->ensurePartners($plan);
             $incomingPartners = $request->input('partners', []);
-
-            foreach ($partners as $index => $partner) {
-                $name = Arr::get($incomingPartners, "$index.name", $partner->name);
-                $partner->update(['name' => $name ?: $partner->name]);
-            }
+            $partners = $this->syncPartners($plan, $incomingPartners);
 
             $netWorth = $request->input('netWorth', []);
             $income = $request->input('income', []);
@@ -103,7 +98,8 @@ class SpendingPlanController extends Controller
                 ExpenseEntry::class,
                 'expenses',
                 'expense_category_id',
-                $request
+                $request,
+                $partners
             );
 
             $this->syncCategoryEntries(
@@ -112,7 +108,8 @@ class SpendingPlanController extends Controller
                 InvestingEntry::class,
                 'investing',
                 'investing_category_id',
-                $request
+                $request,
+                $partners
             );
 
             $this->syncCategoryEntries(
@@ -121,7 +118,8 @@ class SpendingPlanController extends Controller
                 SavingGoalEntry::class,
                 'savingGoals',
                 'saving_goal_category_id',
-                $request
+                $request,
+                $partners
             );
         });
 
@@ -138,7 +136,6 @@ class SpendingPlanController extends Controller
             $plan = Plan::create(['name' => 'Default Plan']);
         }
 
-        $this->ensurePartners($plan);
         $this->ensureCategories($plan, ExpenseCategory::class, self::DEFAULT_EXPENSES);
         $this->ensureCategories($plan, InvestingCategory::class, self::DEFAULT_INVESTING);
         $this->ensureCategories($plan, SavingGoalCategory::class, self::DEFAULT_SAVING_GOALS);
@@ -153,14 +150,32 @@ class SpendingPlanController extends Controller
         ]);
     }
 
-    private function ensurePartners(Plan $plan)
+    private function syncPartners(Plan $plan, array $incomingPartners)
     {
-        $partners = $plan->partners()->orderBy('id')->get();
+        $existingPartners = $plan->partners()->get()->keyBy('id');
+        $partners = collect();
 
-        while ($partners->count() < 2) {
-            $partners->push($plan->partners()->create([
-                'name' => 'Partner ' . ($partners->count() + 1),
-            ]));
+        foreach ($incomingPartners as $index => $partnerPayload) {
+            $partnerId = Arr::get($partnerPayload, 'id');
+            $name = trim((string) Arr::get($partnerPayload, 'name', ''));
+
+            if ($partnerId && $existingPartners->has($partnerId)) {
+                $partner = $existingPartners->get($partnerId);
+                $partner->update(['name' => $name ?: $partner->name]);
+            } else {
+                $partner = $plan->partners()->create([
+                    'name' => $name ?: 'Partner ' . ($index + 1),
+                ]);
+            }
+
+            $partners->push($partner);
+        }
+
+        $keepIds = $partners->pluck('id')->all();
+        if (! empty($keepIds)) {
+            $plan->partners()->whereNotIn('id', $keepIds)->delete();
+        } else {
+            $plan->partners()->delete();
         }
 
         return $partners;
@@ -187,9 +202,9 @@ class SpendingPlanController extends Controller
         string $entryModel,
         string $payloadKey,
         string $foreignKey,
-        Request $request
+        Request $request,
+        $partners
     ): void {
-        $partners = $plan->partners()->orderBy('id')->get();
         $payload = $request->input($payloadKey, []);
 
         foreach ($payload as $categoryPayload) {

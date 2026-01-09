@@ -36,7 +36,7 @@
                                 Make your money plan obvious, calm, and shared.
                             </h1>
                             <p class="mt-4 text-base text-slate-700 md:text-lg">
-                                Track income, expenses, investing, and savings side by side. This layout is built for two partners and keeps guilt-free spending visible without digging through spreadsheets.
+                                Track income, expenses, investing, and savings side by side. Add or remove partners as you need and keep guilt-free spending visible without digging through spreadsheets.
                             </p>
                             <div class="mt-6 flex flex-wrap items-center gap-4">
                                 <button
@@ -52,26 +52,38 @@
                             </div>
                         </div>
                         <div class="rounded-lg border border-slate-200/70 bg-white/80 p-5 shadow-sm">
-                            <h2 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Partner Labels</h2>
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <h2 class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Partner Labels</h2>
+                                <button
+                                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                                    type="button"
+                                    @click="addPartner"
+                                >
+                                    Add Partner
+                                </button>
+                            </div>
                             <div class="mt-4 grid gap-4">
-                                <label class="text-sm font-medium text-slate-700">
-                                    Partner 1
-                                    <input
-                                        class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
-                                        type="text"
-                                        x-model="partners[0].name"
-                                        placeholder="Partner 1"
-                                    />
-                                </label>
-                                <label class="text-sm font-medium text-slate-700">
-                                    Partner 2
-                                    <input
-                                        class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
-                                        type="text"
-                                        x-model="partners[1].name"
-                                        placeholder="Partner 2"
-                                    />
-                                </label>
+                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                    <label class="text-sm font-medium text-slate-700">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <span x-text="`Partner ${index + 1}`"></span>
+                                            <button
+                                                class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                                                type="button"
+                                                @click="removePartner(index)"
+                                                :disabled="partners.length <= 1"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                        <input
+                                            class="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base focus:border-slate-400 focus:outline-none"
+                                            type="text"
+                                            x-model="partners[index].name"
+                                            :placeholder="`Partner ${index + 1}`"
+                                        />
+                                    </label>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -113,36 +125,57 @@
                             <h2 class="text-xl font-semibold text-slate-900">Net Worth Snapshot</h2>
                             <p class="text-sm text-slate-500">Assets + Invested + Saving - Debt</p>
                         </div>
-                        <div class="flex gap-6 text-sm font-semibold text-slate-700">
-                            <span x-text="partnerName(0) + ': ' + formatCurrency(netWorthTotal(0))"></span>
-                            <span x-text="partnerName(1) + ': ' + formatCurrency(netWorthTotal(1))"></span>
+                        <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <span x-text="partnerName(index) + ': ' + formatCurrency(netWorthTotal(index))"></span>
+                            </template>
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(0)"></div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(1)"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Assets</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.assets[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.assets[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.assets[index]" />
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Invested</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.invested[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.invested[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.invested[index]" />
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Saving</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.saving[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.saving[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.saving[index]" />
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Debt</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.debt[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="netWorth.debt[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="netWorth.debt[index]" />
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -159,20 +192,32 @@
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(0)"></div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(1)"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Net Income (Annual)</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="income.net[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="income.net[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="income.net[index]" />
+                            </template>
                         </div>
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-medium text-slate-800">Gross Income (Annual)</div>
-                            <input class="input-field" type="number" step="0.01" x-model.number="income.gross[0]" />
-                            <input class="input-field" type="number" step="0.01" x-model.number="income.gross[1]" />
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <input class="input-field" type="number" step="0.01" x-model.number="income.gross[index]" />
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -199,22 +244,34 @@
                         ></span>
                     </div>
                     <div class="mt-6 grid gap-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(0)"></div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(1)"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                            </template>
                         </div>
                         <template x-for="expense in expenses" :key="expense.label">
-                            <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                            <div
+                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                                :style="partnerColumnsStyle()"
+                            >
                                 <div class="text-sm font-medium text-slate-800" x-text="expense.label"></div>
-                                <input class="input-field" type="number" step="0.01" x-model.number="expense.values[0]" />
-                                <input class="input-field" type="number" step="0.01" x-model.number="expense.values[1]" />
+                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                    <input class="input-field" type="number" step="0.01" x-model.number="expense.values[index]" />
+                                </template>
                             </div>
                         </template>
-                        <div class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-semibold text-slate-900">Subtotal + Buffer</div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalExpenses(0))"></div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalExpenses(1))"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalExpenses(index))"></div>
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -232,22 +289,34 @@
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(0)"></div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(1)"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                            </template>
                         </div>
                         <template x-for="item in investing" :key="item.label">
-                            <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                            <div
+                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                                :style="partnerColumnsStyle()"
+                            >
                                 <div class="text-sm font-medium text-slate-800" x-text="item.label"></div>
-                                <input class="input-field" type="number" step="0.01" x-model.number="item.values[0]" />
-                                <input class="input-field" type="number" step="0.01" x-model.number="item.values[1]" />
+                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                    <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
+                                </template>
                             </div>
                         </template>
-                        <div class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-semibold text-slate-900">Total Investing</div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalInvesting(0))"></div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalInvesting(1))"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalInvesting(index))"></div>
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -265,22 +334,34 @@
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Category</div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(0)"></div>
-                            <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(1)"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
+                            </template>
                         </div>
                         <template x-for="item in savingGoals" :key="item.label">
-                            <div class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                            <div
+                                class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                                :style="partnerColumnsStyle()"
+                            >
                                 <div class="text-sm font-medium text-slate-800" x-text="item.label"></div>
-                                <input class="input-field" type="number" step="0.01" x-model.number="item.values[0]" />
-                                <input class="input-field" type="number" step="0.01" x-model.number="item.values[1]" />
+                                <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                    <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
+                                </template>
                             </div>
                         </template>
-                        <div class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_minmax(160px,0.7fr)_minmax(160px,0.7fr)]">
+                        <div
+                            class="grid gap-3 border-t border-slate-200/70 pt-4 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
+                            :style="partnerColumnsStyle()"
+                        >
                             <div class="text-sm font-semibold text-slate-900">Total Saving Goals</div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalSavingGoals(0))"></div>
-                            <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalSavingGoals(1))"></div>
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <div class="text-sm font-semibold text-slate-900" x-text="formatCurrency(totalSavingGoals(index))"></div>
+                            </template>
                         </div>
                     </div>
                 </section>
@@ -291,9 +372,10 @@
                             <h2 class="text-xl font-semibold text-slate-900">Guilt-Free Spending</h2>
                             <p class="text-sm text-slate-500">What remains after essentials, investing, and savings.</p>
                         </div>
-                        <div class="flex gap-6 text-sm font-semibold text-slate-700">
-                            <span x-text="partnerName(0) + ': ' + formatCurrency(guiltyFreeSpending(0))"></span>
-                            <span x-text="partnerName(1) + ': ' + formatCurrency(guiltyFreeSpending(1))"></span>
+                        <div class="flex flex-wrap gap-6 text-sm font-semibold text-slate-700">
+                            <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
+                                <span x-text="partnerName(index) + ': ' + formatCurrency(guiltyFreeSpending(index))"></span>
+                            </template>
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3 rounded-lg border border-slate-200/70 bg-slate-50 px-4 py-5 text-sm text-slate-600">

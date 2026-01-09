@@ -50,14 +50,49 @@ window.cspPlan = function () {
         partnerName(index) {
             return this.partners[index]?.name || `Partner ${index + 1}`;
         },
+        partnerKey(partner, index) {
+            return partner?.id ?? `new-${index}`;
+        },
+        partnerColumnsStyle() {
+            return { '--partner-count': Math.max(this.partners.length, 1) };
+        },
+        addPartner() {
+            const nextIndex = this.partners.length;
+            this.partners.push({ id: null, name: `Partner ${nextIndex + 1}` });
+            this.netWorth.assets.push(0);
+            this.netWorth.invested.push(0);
+            this.netWorth.saving.push(0);
+            this.netWorth.debt.push(0);
+            this.income.net.push(0);
+            this.income.gross.push(0);
+            this.expenses.forEach((item) => item.values.push(0));
+            this.investing.forEach((item) => item.values.push(0));
+            this.savingGoals.forEach((item) => item.values.push(0));
+        },
+        removePartner(index) {
+            if (this.partners.length <= 1) {
+                return;
+            }
+
+            this.partners.splice(index, 1);
+            this.netWorth.assets.splice(index, 1);
+            this.netWorth.invested.splice(index, 1);
+            this.netWorth.saving.splice(index, 1);
+            this.netWorth.debt.splice(index, 1);
+            this.income.net.splice(index, 1);
+            this.income.gross.splice(index, 1);
+            this.expenses.forEach((item) => item.values.splice(index, 1));
+            this.investing.forEach((item) => item.values.splice(index, 1));
+            this.savingGoals.forEach((item) => item.values.splice(index, 1));
+        },
         toNumber(value) {
             return Number.isFinite(value) ? value : Number.parseFloat(value) || 0;
         },
-        sumPair(values) {
+        sumValues(values) {
             return values.reduce((total, value) => total + this.toNumber(value), 0);
         },
         sumItems(items, index) {
-            return items.reduce((total, item) => total + this.toNumber(item.values[index]), 0);
+            return items.reduce((total, item) => total + this.toNumber(item.values?.[index] ?? 0), 0);
         },
         formatCurrency(value) {
             const formatter = new Intl.NumberFormat('en-US', {
@@ -91,21 +126,21 @@ window.cspPlan = function () {
         },
         totalIncomeNet(index) {
             if (index === undefined) {
-                return this.netIncome(0) + this.netIncome(1);
+                return this.sumValues(this.income.net);
             }
 
             return this.netIncome(index);
         },
         totalIncomeGross(index) {
             if (index === undefined) {
-                return this.grossIncome(0) + this.grossIncome(1);
+                return this.sumValues(this.income.gross);
             }
 
             return this.grossIncome(index);
         },
         expensesSubtotal(index) {
             if (index === undefined) {
-                return this.sumItems(this.expenses, 0) + this.sumItems(this.expenses, 1);
+                return this.partners.reduce((total, _partner, partnerIndex) => total + this.sumItems(this.expenses, partnerIndex), 0);
             }
 
             return this.sumItems(this.expenses, index);
@@ -119,14 +154,14 @@ window.cspPlan = function () {
         },
         totalInvesting(index) {
             if (index === undefined) {
-                return this.sumItems(this.investing, 0) + this.sumItems(this.investing, 1);
+                return this.partners.reduce((total, _partner, partnerIndex) => total + this.sumItems(this.investing, partnerIndex), 0);
             }
 
             return this.sumItems(this.investing, index);
         },
         totalSavingGoals(index) {
             if (index === undefined) {
-                return this.sumItems(this.savingGoals, 0) + this.sumItems(this.savingGoals, 1);
+                return this.partners.reduce((total, _partner, partnerIndex) => total + this.sumItems(this.savingGoals, partnerIndex), 0);
             }
 
             return this.sumItems(this.savingGoals, index);
@@ -141,22 +176,32 @@ window.cspPlan = function () {
 
             return (value / income) * 100;
         },
-        pairValues(list, key) {
-            return [0, 1].map((index) => this.toNumber(list?.[index]?.[key] ?? 0));
+        listValues(list, key, count) {
+            return Array.from({ length: count }, (_, index) => this.toNumber(list?.[index]?.[key] ?? 0));
         },
-        categoryValues(values) {
-            return [0, 1].map((index) => this.toNumber(values?.[index] ?? 0));
+        categoryValues(values, count) {
+            return Array.from({ length: count }, (_, index) => this.toNumber(values?.[index] ?? 0));
         },
         applyCategoryData(source, fallback) {
             if (!Array.isArray(source) || source.length === 0) {
                 return fallback;
             }
 
+            const count = this.partners.length;
             return source.map((item, index) => ({
                 id: item.id ?? fallback[index]?.id ?? null,
                 label: item.label ?? fallback[index]?.label ?? 'Category',
-                values: this.categoryValues(item.values),
+                values: this.categoryValues(item.values, count),
             }));
+        },
+        ensurePartnerCount(count) {
+            if (!Number.isInteger(count) || count < 1) {
+                return;
+            }
+
+            while (this.partners.length < count) {
+                this.addPartner();
+            }
         },
         applyPlan(data) {
             if (!data) {
@@ -173,23 +218,23 @@ window.cspPlan = function () {
                     name: partner.name || `Partner ${index + 1}`,
                 }));
 
-                while (partners.length < 2) {
-                    partners.push({ id: null, name: `Partner ${partners.length + 1}` });
-                }
-
-                this.partners = partners.slice(0, 2);
+                this.partners = partners;
             }
 
+            this.ensurePartnerCount(Math.max(this.partners.length, 1));
+
             if (Array.isArray(data.netWorth)) {
-                this.netWorth.assets = this.pairValues(data.netWorth, 'assets');
-                this.netWorth.invested = this.pairValues(data.netWorth, 'invested');
-                this.netWorth.saving = this.pairValues(data.netWorth, 'saving');
-                this.netWorth.debt = this.pairValues(data.netWorth, 'debt');
+                const count = this.partners.length;
+                this.netWorth.assets = this.listValues(data.netWorth, 'assets', count);
+                this.netWorth.invested = this.listValues(data.netWorth, 'invested', count);
+                this.netWorth.saving = this.listValues(data.netWorth, 'saving', count);
+                this.netWorth.debt = this.listValues(data.netWorth, 'debt', count);
             }
 
             if (Array.isArray(data.income)) {
-                this.income.net = this.pairValues(data.income, 'net');
-                this.income.gross = this.pairValues(data.income, 'gross');
+                const count = this.partners.length;
+                this.income.net = this.listValues(data.income, 'net', count);
+                this.income.gross = this.listValues(data.income, 'gross', count);
             }
 
             this.expenses = this.applyCategoryData(data.expenses, this.expenses);
@@ -197,6 +242,7 @@ window.cspPlan = function () {
             this.savingGoals = this.applyCategoryData(data.savingGoals, this.savingGoals);
         },
         buildPayload() {
+            const count = this.partners.length;
             return {
                 plan: {
                     buffer_percent: this.toNumber(this.bufferPercent),
@@ -205,13 +251,13 @@ window.cspPlan = function () {
                     id: partner.id,
                     name: partner.name || `Partner ${index + 1}`,
                 })),
-                netWorth: [0, 1].map((index) => ({
+                netWorth: Array.from({ length: count }, (_, index) => ({
                     assets: this.toNumber(this.netWorth.assets[index]),
                     invested: this.toNumber(this.netWorth.invested[index]),
                     saving: this.toNumber(this.netWorth.saving[index]),
                     debt: this.toNumber(this.netWorth.debt[index]),
                 })),
-                income: [0, 1].map((index) => ({
+                income: Array.from({ length: count }, (_, index) => ({
                     net: this.toNumber(this.income.net[index]),
                     gross: this.toNumber(this.income.gross[index]),
                 })),
