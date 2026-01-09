@@ -391,13 +391,15 @@ window.cspPlan = function () {
 window.cspSnapshots = function () {
     return {
         loading: true,
+        allSnapshots: [],
         snapshots: [],
-        latest: null,
         currentNetWorth: null,
         chart: null,
         series: {},
         resizeHandler: null,
         resizeObserver: null,
+        rangeStart: '',
+        rangeEnd: '',
         init() {
             this.fetchSummary();
         },
@@ -429,14 +431,11 @@ window.cspSnapshots = function () {
         async fetchSummary() {
             this.loading = true;
             try {
-                const [summaryResponse, planResponse] = await Promise.all([
-                    window.axios.get('/plan/snapshots/summary/data'),
-                    window.axios.get('/plan/data'),
-                ]);
+                const summaryResponse = await window.axios.get('/plan/snapshots/summary/data');
 
-                this.snapshots = summaryResponse.data.snapshots ?? [];
-                this.latest = summaryResponse.data.latest ?? null;
-                this.currentNetWorth = this.calculateNetWorth(planResponse.data);
+                this.allSnapshots = summaryResponse.data.snapshots ?? [];
+                this.setDefaultRange();
+                this.applyFilters();
                 this.$nextTick(() => {
                     this.renderChart();
                 });
@@ -446,25 +445,56 @@ window.cspSnapshots = function () {
                 this.loading = false;
             }
         },
-        calculateNetWorth(planData) {
-            if (!planData || !Array.isArray(planData.netWorth)) {
-                return null;
+        setDefaultRange() {
+            if (!this.allSnapshots.length || (this.rangeStart && this.rangeEnd)) {
+                return;
             }
 
-            return planData.netWorth.reduce((total, entry) => {
-                const assets = Number(entry.assets ?? 0);
-                const invested = Number(entry.invested ?? 0);
-                const saving = Number(entry.saving ?? 0);
-                const debt = Number(entry.debt ?? 0);
+            const dates = this.allSnapshots
+                .map((snapshot) => snapshot.captured_at?.split('T')[0])
+                .filter(Boolean);
 
-                return total + assets + invested + saving - debt;
-            }, 0);
+            if (!dates.length) {
+                return;
+            }
+
+            this.rangeStart = dates[0];
+            this.rangeEnd = dates[dates.length - 1];
+        },
+        applyFilters() {
+            const start = this.rangeStart || null;
+            const end = this.rangeEnd || null;
+
+            this.snapshots = this.allSnapshots.filter((snapshot) => {
+                const capturedDate = snapshot.captured_at?.split('T')[0];
+                if (!capturedDate) {
+                    return false;
+                }
+
+                if (start && capturedDate < start) {
+                    return false;
+                }
+
+                if (end && capturedDate > end) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            const latest = this.latestSnapshot();
+            this.currentNetWorth = latest ? Number(latest.net_worth ?? 0) : null;
+            this.$nextTick(() => {
+                this.renderChart();
+            });
+        },
+        resetRange() {
+            this.rangeStart = '';
+            this.rangeEnd = '';
+            this.setDefaultRange();
+            this.applyFilters();
         },
         latestSnapshot() {
-            if (this.latest) {
-                return this.latest;
-            }
-
             return this.snapshots.length ? this.snapshots[this.snapshots.length - 1] : null;
         },
         latestSnapshotNetWorth() {
@@ -615,7 +645,16 @@ window.cspSnapshots = function () {
                 .filter(Boolean);
         },
         renderChart() {
-            if (!this.$refs.chart || this.snapshots.length === 0) {
+            if (!this.$refs.chart) {
+                return;
+            }
+
+            if (this.snapshots.length === 0) {
+                if (this.chart) {
+                    this.chart.remove();
+                    this.chart = null;
+                    this.series = {};
+                }
                 return;
             }
 

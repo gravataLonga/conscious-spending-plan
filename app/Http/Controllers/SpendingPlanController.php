@@ -14,6 +14,7 @@ use App\Models\Plan;
 use App\Models\PlanSnapshot;
 use App\Models\SavingGoalCategory;
 use App\Models\SavingGoalEntry;
+use App\PlanDefaults;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -23,35 +24,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SpendingPlanController extends Controller
 {
-    private const DEFAULT_EXPENSES = [
-        'Rent or Mortgage',
-        'Utilities',
-        'Insurance',
-        'Car Payment',
-        'Groceries',
-        'Clothes',
-        'Phone',
-        'Subscriptions',
-        'Debt',
-    ];
-
-    private const DEFAULT_INVESTING = [
-        'Post-tax Retirement Saving',
-        'ETF',
-        'Other',
-    ];
-
-    private const DEFAULT_SAVING_GOALS = [
-        'Vacation',
-        'Gifts',
-        'Long Term Emergency Fund',
-    ];
-
-    private const DEFAULT_PARTNERS = [
-        'Partner 1',
-        'Partner 2',
-    ];
-
     public function show()
     {
         return view('plan');
@@ -324,9 +296,9 @@ class SpendingPlanController extends Controller
             $plan = $user->plan()->create(['name' => 'Default Plan']);
         }
 
-        $this->ensureCategories($plan, ExpenseCategory::class, self::DEFAULT_EXPENSES);
-        $this->ensureCategories($plan, InvestingCategory::class, self::DEFAULT_INVESTING);
-        $this->ensureCategories($plan, SavingGoalCategory::class, self::DEFAULT_SAVING_GOALS);
+        $this->ensureCategories($plan, ExpenseCategory::class, PlanDefaults::Expenses->labels());
+        $this->ensureCategories($plan, InvestingCategory::class, PlanDefaults::Investing->labels());
+        $this->ensureCategories($plan, SavingGoalCategory::class, PlanDefaults::SavingGoals->labels());
         $this->ensurePartners($plan);
 
         return $plan->fresh([
@@ -391,7 +363,7 @@ class SpendingPlanController extends Controller
             return;
         }
 
-        foreach (self::DEFAULT_PARTNERS as $partnerName) {
+        foreach (PlanDefaults::Partners->labels() as $partnerName) {
             $plan->partners()->create(['name' => $partnerName]);
         }
     }

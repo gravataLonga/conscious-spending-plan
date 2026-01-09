@@ -7,5 +7,7 @@
         "codex",
         "phpstorm"
     ],
-    "guidelines": []
+    "guidelines": [
+        "laravel/fortify"
+    ]
 }
