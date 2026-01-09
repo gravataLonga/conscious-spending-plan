@@ -53,8 +53,25 @@ window.cspPlan = function () {
         partnerKey(partner, index) {
             return partner?.id ?? `new-${index}`;
         },
+        categoryKey(item, index) {
+            return item?.id ?? `new-${index}`;
+        },
         partnerColumnsStyle() {
             return { '--partner-count': Math.max(this.partners.length, 1) };
+        },
+        emptyValues(count) {
+            return Array.from({ length: count }, () => 0);
+        },
+        sanitizeLabel(label, fallback = 'Category') {
+            const trimmed = String(label ?? '').trim();
+            return trimmed.length ? trimmed : fallback;
+        },
+        createCategory(label) {
+            return {
+                id: null,
+                label: this.sanitizeLabel(label),
+                values: this.emptyValues(this.partners.length),
+            };
         },
         addPartner() {
             const nextIndex = this.partners.length;
@@ -84,6 +101,24 @@ window.cspPlan = function () {
             this.expenses.forEach((item) => item.values.splice(index, 1));
             this.investing.forEach((item) => item.values.splice(index, 1));
             this.savingGoals.forEach((item) => item.values.splice(index, 1));
+        },
+        addExpense() {
+            this.expenses.push(this.createCategory('New Expense'));
+        },
+        removeExpense(index) {
+            this.expenses.splice(index, 1);
+        },
+        addInvesting() {
+            this.investing.push(this.createCategory('New Investing'));
+        },
+        removeInvesting(index) {
+            this.investing.splice(index, 1);
+        },
+        addSavingGoal() {
+            this.savingGoals.push(this.createCategory('New Goal'));
+        },
+        removeSavingGoal(index) {
+            this.savingGoals.splice(index, 1);
         },
         toNumber(value) {
             return Number.isFinite(value) ? value : Number.parseFloat(value) || 0;
@@ -183,14 +218,18 @@ window.cspPlan = function () {
             return Array.from({ length: count }, (_, index) => this.toNumber(values?.[index] ?? 0));
         },
         applyCategoryData(source, fallback) {
-            if (!Array.isArray(source) || source.length === 0) {
+            if (!Array.isArray(source)) {
                 return fallback;
+            }
+
+            if (source.length === 0) {
+                return [];
             }
 
             const count = this.partners.length;
             return source.map((item, index) => ({
                 id: item.id ?? fallback[index]?.id ?? null,
-                label: item.label ?? fallback[index]?.label ?? 'Category',
+                label: this.sanitizeLabel(item.label ?? fallback[index]?.label ?? 'Category'),
                 values: this.categoryValues(item.values, count),
             }));
         },
@@ -263,14 +302,17 @@ window.cspPlan = function () {
                 })),
                 expenses: this.expenses.map((item) => ({
                     id: item.id,
+                    label: this.sanitizeLabel(item.label),
                     values: item.values.map((value) => this.toNumber(value)),
                 })),
                 investing: this.investing.map((item) => ({
                     id: item.id,
+                    label: this.sanitizeLabel(item.label),
                     values: item.values.map((value) => this.toNumber(value)),
                 })),
                 savingGoals: this.savingGoals.map((item) => ({
                     id: item.id,
+                    label: this.sanitizeLabel(item.label),
                     values: item.values.map((value) => this.toNumber(value)),
                 })),
             };

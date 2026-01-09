@@ -206,17 +206,29 @@ class SpendingPlanController extends Controller
         $partners
     ): void {
         $payload = $request->input($payloadKey, []);
+        $existingCategories = $categoryModel::where('plan_id', $plan->id)->get()->keyBy('id');
+        $keptCategories = collect();
 
-        foreach ($payload as $categoryPayload) {
+        foreach ($payload as $index => $categoryPayload) {
             $categoryId = Arr::get($categoryPayload, 'id');
-            if (! $categoryId) {
-                continue;
+            $label = trim((string) Arr::get($categoryPayload, 'label', ''));
+            $sort = $index + 1;
+
+            if ($categoryId && $existingCategories->has($categoryId)) {
+                $category = $existingCategories->get($categoryId);
+                $category->update([
+                    'name' => $label ?: $category->name,
+                    'sort' => $sort,
+                ]);
+            } else {
+                $category = $categoryModel::create([
+                    'plan_id' => $plan->id,
+                    'name' => $label ?: 'Category',
+                    'sort' => $sort,
+                ]);
             }
 
-            $category = $categoryModel::where('plan_id', $plan->id)->find($categoryId);
-            if (! $category) {
-                continue;
-            }
+            $keptCategories->push($category);
 
             $values = Arr::get($categoryPayload, 'values', []);
 
@@ -226,6 +238,13 @@ class SpendingPlanController extends Controller
                     ['amount' => (float) Arr::get($values, $index, 0)]
                 );
             }
+        }
+
+        $keepIds = $keptCategories->pluck('id')->all();
+        if (! empty($keepIds)) {
+            $categoryModel::where('plan_id', $plan->id)->whereNotIn('id', $keepIds)->delete();
+        } else {
+            $categoryModel::where('plan_id', $plan->id)->delete();
         }
     }
 

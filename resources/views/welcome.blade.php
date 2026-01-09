@@ -228,10 +228,19 @@
                             <h2 class="text-xl font-semibold text-slate-900">Total Expenses</h2>
                             <p class="text-sm text-slate-500">Buffer adds a percentage above expenses to keep space for surprises.</p>
                         </div>
-                        <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                            <span x-text="formatCurrency(totalExpenses())"></span>
-                            <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
-                            ></span>
+                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                            <button
+                                class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                                type="button"
+                                @click="addExpense"
+                            >
+                                Add Expense
+                            </button>
+                            <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                                <span x-text="formatCurrency(totalExpenses())"></span>
+                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalExpenses(), totalIncomeNet())) + ' of net income'"
+                                ></span>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -253,12 +262,21 @@
                                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
                             </template>
                         </div>
-                        <template x-for="expense in expenses" :key="expense.label">
+                        <template x-for="(expense, index) in expenses" :key="categoryKey(expense, index)">
                             <div
                                 class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
                                 :style="partnerColumnsStyle()"
                             >
-                                <div class="text-sm font-medium text-slate-800" x-text="expense.label"></div>
+                                <div class="flex items-center gap-2">
+                                    <input class="input-field flex-1" type="text" x-model="expense.label" />
+                                    <button
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-700"
+                                        type="button"
+                                        @click="removeExpense(index)"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                                 <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
                                     <input class="input-field" type="number" step="0.01" x-model.number="expense.values[index]" />
                                 </template>
@@ -282,10 +300,19 @@
                             <h2 class="text-xl font-semibold text-slate-900">Investing</h2>
                             <p class="text-sm text-slate-500">Percent of net income shown for focus.</p>
                         </div>
-                        <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                            <span x-text="formatCurrency(totalInvesting())"></span>
-                            <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalInvesting(), totalIncomeNet())) + ' of net income'"
-                            ></span>
+                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                            <button
+                                class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                                type="button"
+                                @click="addInvesting"
+                            >
+                                Add Investing
+                            </button>
+                            <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                                <span x-text="formatCurrency(totalInvesting())"></span>
+                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalInvesting(), totalIncomeNet())) + ' of net income'"
+                                ></span>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
@@ -298,12 +325,21 @@
                                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
                             </template>
                         </div>
-                        <template x-for="item in investing" :key="item.label">
+                        <template x-for="(item, index) in investing" :key="categoryKey(item, index)">
                             <div
                                 class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
                                 :style="partnerColumnsStyle()"
                             >
-                                <div class="text-sm font-medium text-slate-800" x-text="item.label"></div>
+                                <div class="flex items-center gap-2">
+                                    <input class="input-field flex-1" type="text" x-model="item.label" />
+                                    <button
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-700"
+                                        type="button"
+                                        @click="removeInvesting(index)"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                                 <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
                                     <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
                                 </template>
@@ -327,10 +363,19 @@
                             <h2 class="text-xl font-semibold text-slate-900">Saving Goals</h2>
                             <p class="text-sm text-slate-500">Keep intentional goals in sight.</p>
                         </div>
-                        <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
-                            <span x-text="formatCurrency(totalSavingGoals())"></span>
-                            <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalSavingGoals(), totalIncomeNet())) + ' of net income'"
-                            ></span>
+                        <div class="flex flex-wrap items-center gap-3 text-sm font-semibold text-slate-700">
+                            <button
+                                class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                                type="button"
+                                @click="addSavingGoal"
+                            >
+                                Add Saving Goal
+                            </button>
+                            <div class="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                                <span x-text="formatCurrency(totalSavingGoals())"></span>
+                                <span class="text-xs text-slate-500" x-text="formatPercent(shareOfIncome(totalSavingGoals(), totalIncomeNet())) + ' of net income'"
+                                ></span>
+                            </div>
                         </div>
                     </div>
                     <div class="mt-6 grid gap-3">
@@ -343,12 +388,21 @@
                                 <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" x-text="partnerName(index)"></div>
                             </template>
                         </div>
-                        <template x-for="item in savingGoals" :key="item.label">
+                        <template x-for="(item, index) in savingGoals" :key="categoryKey(item, index)">
                             <div
                                 class="grid gap-3 md:grid-cols-[minmax(240px,1fr)_repeat(var(--partner-count),minmax(160px,0.7fr))]"
                                 :style="partnerColumnsStyle()"
                             >
-                                <div class="text-sm font-medium text-slate-800" x-text="item.label"></div>
+                                <div class="flex items-center gap-2">
+                                    <input class="input-field flex-1" type="text" x-model="item.label" />
+                                    <button
+                                        class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 transition hover:text-slate-700"
+                                        type="button"
+                                        @click="removeSavingGoal(index)"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                                 <template x-for="(partner, index) in partners" :key="partnerKey(partner, index)">
                                     <input class="input-field" type="number" step="0.01" x-model.number="item.values[index]" />
                                 </template>
