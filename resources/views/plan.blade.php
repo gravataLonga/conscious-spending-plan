@@ -47,6 +47,19 @@
                         >
                             Export PDF
                         </a>
+                        <label class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            <span>Currency</span>
+                            <select
+                                class="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 focus:border-slate-400 focus:outline-none"
+                                x-model="currencyCode"
+                                aria-label="Select currency"
+                            >
+                                <template x-for="currency in currencies" :key="currency.code">
+                                    <option :value="currency.code" x-text="`${currency.code} · ${currency.symbol} ${currency.name}`"></option>
+                                </template>
+                                <option x-show="!currencies.length" :value="currencyCode" x-text="currencyCode"></option>
+                            </select>
+                        </label>
                         <span class="text-sm text-slate-500" x-text="saveNotice" x-show="saveNotice"></span>
                         <span class="text-sm text-slate-500" x-text="snapshotNotice" x-show="snapshotNotice"></span>
                         <span class="text-sm text-slate-500" x-show="loading">Loading data...</span>

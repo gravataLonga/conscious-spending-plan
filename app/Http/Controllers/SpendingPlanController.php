@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePlanSnapshotRequest;
+use App\Models\Currency;
 use App\Models\ExpenseCategory;
 use App\Models\ExpenseEntry;
 use App\Models\Income;
@@ -33,7 +34,7 @@ class SpendingPlanController extends Controller
     {
         $plan = $this->ensurePlan();
 
-        return response()->json($this->serializePlan($plan));
+        return response()->json($this->serializePlanResponse($plan));
     }
 
     public function store(Request $request)
@@ -44,6 +45,14 @@ class SpendingPlanController extends Controller
             $bufferPercent = $request->input('plan.buffer_percent');
             if ($bufferPercent !== null) {
                 $plan->update(['buffer_percent' => (float) $bufferPercent]);
+            }
+
+            $currencyCode = $request->input('plan.currency');
+            if ($currencyCode !== null) {
+                $currencyCode = strtoupper(trim((string) $currencyCode));
+                if (Currency::where('code', $currencyCode)->exists()) {
+                    $plan->update(['currency' => $currencyCode]);
+                }
             }
 
             $incomingPartners = $request->input('partners', []);
@@ -107,7 +116,7 @@ class SpendingPlanController extends Controller
 
         $plan->refresh();
 
-        return response()->json($this->serializePlan($plan));
+        return response()->json($this->serializePlanResponse($plan));
     }
 
     public function exportCsv(): StreamedResponse
@@ -250,6 +259,7 @@ class SpendingPlanController extends Controller
         return response()->json([
             'snapshots' => $summaries,
             'latest' => $latest,
+            'currency' => $plan->currency,
         ]);
     }
 
@@ -295,12 +305,21 @@ class SpendingPlanController extends Controller
         $name = $request->validated()['name'] ?? now()->format('F Y');
 
         $snapshot = DB::transaction(function () use ($plan, $name) {
+            $payload = $this->serializePlan($plan);
+            $totals = $this->calculateSnapshotTotals($payload);
+
             $snapshotPlan = $this->clonePlanForSnapshot($plan);
 
             return $plan->snapshots()->create([
                 'name' => $name,
                 'captured_at' => now(),
                 'snapshot_plan_id' => $snapshotPlan->id,
+                'total_net_worth' => $totals['net_worth'],
+                'net_income' => $totals['net_income'],
+                'total_expenses' => $totals['expenses'],
+                'total_saving' => $totals['saving'],
+                'total_investing' => $totals['investing'],
+                'guilt_free' => $totals['guilt_free'],
                 'payload' => [],
             ]);
         });
@@ -517,12 +536,37 @@ class SpendingPlanController extends Controller
         ];
     }
 
+    /**
+     * @return array{plan: array{id: int, buffer_percent: float, currency: string|null}, partners: array<int, array{id: int, name: string}>, netWorth: array<int, array{assets: float, invested: float, saving: float, debt: float}>, income: array<int, array{net: float, gross: float}>, expenses: array<int, array{id: int, label: string, values: array<int, float>}>, investing: array<int, array{id: int, label: string, values: array<int, float>}>, savingGoals: array<int, array{id: int, label: string, values: array<int, float>}>, currencies: array<int, array{code: string, name: string, symbol: string}>}
+     */
+    private function serializePlanResponse(Plan $plan): array
+    {
+        return array_merge($this->serializePlan($plan), [
+            'currencies' => Currency::query()
+                ->orderBy('name')
+                ->get(['code', 'name', 'symbol'])
+                ->map(fn (Currency $currency) => [
+                    'code' => $currency->code,
+                    'name' => $currency->name,
+                    'symbol' => $currency->symbol,
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
     private function serializeSnapshot(PlanSnapshot $snapshot): array
     {
         return [
             'id' => $snapshot->id,
             'name' => $snapshot->name,
             'captured_at' => optional($snapshot->captured_at)->toIso8601String(),
+            'total_net_worth' => $snapshot->total_net_worth !== null ? (float) $snapshot->total_net_worth : null,
+            'net_income' => $snapshot->net_income !== null ? (float) $snapshot->net_income : null,
+            'total_expenses' => $snapshot->total_expenses !== null ? (float) $snapshot->total_expenses : null,
+            'total_saving' => $snapshot->total_saving !== null ? (float) $snapshot->total_saving : null,
+            'total_investing' => $snapshot->total_investing !== null ? (float) $snapshot->total_investing : null,
+            'guilt_free' => $snapshot->guilt_free !== null ? (float) $snapshot->guilt_free : null,
         ];
     }
 
@@ -533,25 +577,31 @@ class SpendingPlanController extends Controller
             : ($snapshot->payload ?? []);
 
         $assets = 0.0;
-        $investingTotal = 0.0;
-        $savingTotal = 0.0;
-        $netWorthTotal = 0.0;
 
         foreach ($payload['netWorth'] ?? [] as $entry) {
             $assetsValue = (float) ($entry['assets'] ?? 0);
-            $investedValue = (float) ($entry['invested'] ?? 0);
-            $savingValue = (float) ($entry['saving'] ?? 0);
-            $debtValue = (float) ($entry['debt'] ?? 0);
-
             $assets += $assetsValue;
-            $investingTotal += $investedValue;
-            $savingTotal += $savingValue;
-            $netWorthTotal += $assetsValue + $investedValue + $savingValue - $debtValue;
         }
 
-        $expensesSubtotal = $this->sumCategoryValues($payload['expenses'] ?? []);
-        $bufferPercent = (float) ($payload['plan']['buffer_percent'] ?? 0);
-        $expenses = $expensesSubtotal + ($expensesSubtotal * $bufferPercent / 100);
+        $totals = $this->calculateSnapshotTotals($payload);
+        $netWorthTotal = $snapshot->total_net_worth !== null
+            ? (float) $snapshot->total_net_worth
+            : $totals['net_worth'];
+        $netIncome = $snapshot->net_income !== null
+            ? (float) $snapshot->net_income
+            : $totals['net_income'];
+        $expenses = $snapshot->total_expenses !== null
+            ? (float) $snapshot->total_expenses
+            : $totals['expenses'];
+        $savingTotal = $snapshot->total_saving !== null
+            ? (float) $snapshot->total_saving
+            : $totals['saving'];
+        $investingTotal = $snapshot->total_investing !== null
+            ? (float) $snapshot->total_investing
+            : $totals['investing'];
+        $guiltFree = $snapshot->guilt_free !== null
+            ? (float) $snapshot->guilt_free
+            : $totals['guilt_free'];
 
         return [
             'id' => $snapshot->id,
@@ -562,6 +612,49 @@ class SpendingPlanController extends Controller
             'investing' => $investingTotal,
             'saving' => $savingTotal,
             'net_worth' => $netWorthTotal,
+            'net_income' => $netIncome,
+            'guilt_free' => $guiltFree,
+        ];
+    }
+
+    /**
+     * @param  array{plan?: array{buffer_percent?: float|int|string}, netWorth?: array<int, array{assets?: float|int|string, invested?: float|int|string, saving?: float|int|string, debt?: float|int|string}>, income?: array<int, array{net?: float|int|string}>, expenses?: array<int, array{values?: array<int, float|int|string|null>}>, investing?: array<int, array{values?: array<int, float|int|string|null>}>, savingGoals?: array<int, array{values?: array<int, float|int|string|null>}>}  $payload
+     * @return array{net_worth: float, net_income: float, expenses: float, saving: float, investing: float, guilt_free: float}
+     */
+    private function calculateSnapshotTotals(array $payload): array
+    {
+        $netWorthTotal = 0.0;
+        $netIncome = 0.0;
+
+        foreach ($payload['netWorth'] ?? [] as $entry) {
+            $assetsValue = (float) ($entry['assets'] ?? 0);
+            $investedValue = (float) ($entry['invested'] ?? 0);
+            $savingValue = (float) ($entry['saving'] ?? 0);
+            $debtValue = (float) ($entry['debt'] ?? 0);
+
+            $netWorthTotal += $assetsValue + $investedValue + $savingValue - $debtValue;
+        }
+
+        foreach ($payload['income'] ?? [] as $entry) {
+            $netIncome += (float) ($entry['net'] ?? 0);
+        }
+
+        $expensesSubtotal = $this->sumCategoryValues($payload['expenses'] ?? []);
+        $bufferPercent = (float) ($payload['plan']['buffer_percent'] ?? 0);
+        $expenses = $expensesSubtotal + ($expensesSubtotal * $bufferPercent / 100);
+
+        $investingTotal = $this->sumCategoryValues($payload['investing'] ?? []);
+        $savingTotal = $this->sumCategoryValues($payload['savingGoals'] ?? []);
+
+        $guiltFree = $netIncome - $expenses - $investingTotal - $savingTotal;
+
+        return [
+            'net_worth' => $netWorthTotal,
+            'net_income' => $netIncome,
+            'expenses' => $expenses,
+            'saving' => $savingTotal,
+            'investing' => $investingTotal,
+            'guilt_free' => $guiltFree,
         ];
     }
 

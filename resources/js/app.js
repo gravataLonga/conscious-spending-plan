@@ -11,6 +11,8 @@ window.cspPlan = function () {
         snapshotSaving: false,
         saveNotice: '',
         snapshotNotice: '',
+        currencyCode: 'USD',
+        currencies: [],
         partners: [
             { id: null, name: 'Partner 1' },
             { id: null, name: 'Partner 2' },
@@ -135,7 +137,7 @@ window.cspPlan = function () {
         formatCurrency(value) {
             const formatter = new Intl.NumberFormat('en-US', {
                 style: 'currency',
-                currency: 'USD',
+                currency: this.currencyCode || 'USD',
                 maximumFractionDigits: 0,
             });
 
@@ -250,6 +252,14 @@ window.cspPlan = function () {
                 return;
             }
 
+            if (Array.isArray(data.currencies)) {
+                this.currencies = data.currencies;
+            }
+
+            if (data.plan?.currency) {
+                this.currencyCode = data.plan.currency;
+            }
+
             if (data.plan?.buffer_percent !== undefined) {
                 this.bufferPercent = this.toNumber(data.plan.buffer_percent);
             }
@@ -288,6 +298,7 @@ window.cspPlan = function () {
             return {
                 plan: {
                     buffer_percent: this.toNumber(this.bufferPercent),
+                    currency: this.currencyCode,
                 },
                 partners: this.partners.map((partner, index) => ({
                     id: partner.id,
@@ -394,6 +405,7 @@ window.cspSnapshots = function () {
         allSnapshots: [],
         snapshots: [],
         currentNetWorth: null,
+        currencyCode: 'USD',
         chart: null,
         series: {},
         resizeHandler: null,
@@ -406,7 +418,7 @@ window.cspSnapshots = function () {
         formatCurrency(value) {
             const formatter = new Intl.NumberFormat('en-US', {
                 style: 'currency',
-                currency: 'USD',
+                currency: this.currencyCode || 'USD',
                 maximumFractionDigits: 0,
             });
 
@@ -434,6 +446,7 @@ window.cspSnapshots = function () {
                 const summaryResponse = await window.axios.get('/plan/snapshots/summary/data');
 
                 this.allSnapshots = summaryResponse.data.snapshots ?? [];
+                this.currencyCode = summaryResponse.data.currency || this.currencyCode;
                 this.setDefaultRange();
                 this.applyFilters();
                 this.$nextTick(() => {

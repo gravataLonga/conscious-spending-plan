@@ -12,6 +12,12 @@ class PlanSnapshot extends Model
         'snapshot_plan_id',
         'name',
         'captured_at',
+        'total_net_worth',
+        'net_income',
+        'total_expenses',
+        'total_saving',
+        'total_investing',
+        'guilt_free',
         'payload',
     ];
 
@@ -19,6 +25,12 @@ class PlanSnapshot extends Model
     {
         return [
             'captured_at' => 'datetime',
+            'total_net_worth' => 'decimal:2',
+            'net_income' => 'decimal:2',
+            'total_expenses' => 'decimal:2',
+            'total_saving' => 'decimal:2',
+            'total_investing' => 'decimal:2',
+            'guilt_free' => 'decimal:2',
             'payload' => 'array',
         ];
     }

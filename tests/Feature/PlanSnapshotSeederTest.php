@@ -67,6 +67,12 @@ class PlanSnapshotSeederTest extends TestCase
         $snapshot = $plan->snapshots()->first();
         $this->assertNotNull($snapshot);
         $this->assertSame('January 2026', $snapshot->name);
+        $this->assertEquals(43347.0, (float) $snapshot->total_net_worth);
+        $this->assertEquals(3900.0, (float) $snapshot->net_income);
+        $this->assertEquals(1874.5, (float) $snapshot->total_expenses);
+        $this->assertEquals(500.0, (float) $snapshot->total_saving);
+        $this->assertEquals(913.0, (float) $snapshot->total_investing);
+        $this->assertEquals(612.5, (float) $snapshot->guilt_free);
         $this->assertSame('USD', $snapshot->payload['plan']['currency'] ?? null);
         $this->assertSame(
             'Rent or Mortgage',

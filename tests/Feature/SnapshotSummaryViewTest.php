@@ -19,7 +19,8 @@ class SnapshotSummaryViewTest extends TestCase
         $response->assertOk();
         $response->assertSee('name="range_start"', false);
         $response->assertSee('name="range_end"', false);
-        $response->assertSee('All time');
+        $response->assertSee('Apply filter');
+        $response->assertSee('Reset range');
         $response->assertSee(":class=\"trendClass('assets')\"", false);
     }
 }

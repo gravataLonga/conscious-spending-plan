@@ -149,7 +149,6 @@
                             x-model="rangeStart"
                             :min="allSnapshots[0]?.captured_at?.split('T')[0] ?? ''"
                             :max="rangeEnd || (allSnapshots[allSnapshots.length - 1]?.captured_at?.split('T')[0] ?? '')"
-                            @change="applyFilters()"
                         />
                     </label>
                     <label class="grid gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" for="snapshot-range-end">
@@ -162,15 +161,23 @@
                             x-model="rangeEnd"
                             :min="rangeStart || (allSnapshots[0]?.captured_at?.split('T')[0] ?? '')"
                             :max="allSnapshots[allSnapshots.length - 1]?.captured_at?.split('T')[0] ?? ''"
-                            @change="applyFilters()"
                         />
                     </label>
                     <button
-                        class="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                        class="inline-flex items-center gap-2 rounded-md bg-slate-900 px-5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        type="button"
+                        @click="applyFilters()"
+                        :disabled="loading"
+                    >
+                        Apply filter
+                    </button>
+                    <button
+                        class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
                         type="button"
                         @click="resetRange()"
+                        :disabled="loading"
                     >
-                        All time
+                        Reset range
                     </button>
                 </div>
             </div>

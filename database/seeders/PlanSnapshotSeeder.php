@@ -86,9 +86,17 @@ class PlanSnapshotSeeder extends Seeder
             $savingGoalCategories
         );
 
+        $totals = $this->calculateSnapshotTotals($payload);
+
         $plan->snapshots()->create([
             'name' => $data['snapshot']['name'],
             'captured_at' => Carbon::parse($data['snapshot']['captured_at']),
+            'total_net_worth' => (float) $totals['net_worth'],
+            'net_income' => (float) $totals['net_income'],
+            'total_expenses' => (float) $totals['expenses'],
+            'total_saving' => (float) $totals['saving'],
+            'total_investing' => (float) $totals['investing'],
+            'guilt_free' => (float) $totals['guilt_free'],
             'payload' => $payload,
         ]);
     }
@@ -102,6 +110,63 @@ class PlanSnapshotSeeder extends Seeder
         $plan->expenseCategories()->delete();
         $plan->investingCategories()->delete();
         $plan->savingGoalCategories()->delete();
+    }
+
+    /**
+     * @param  array{plan?: array{buffer_percent?: float|int|string}, netWorth?: array<int, array{assets?: float|int|string, invested?: float|int|string, saving?: float|int|string, debt?: float|int|string}>, income?: array<int, array{net?: float|int|string}>, expenses?: array<int, array{values?: array<int, float|int|string|null>}>, investing?: array<int, array{values?: array<int, float|int|string|null>}>, savingGoals?: array<int, array{values?: array<int, float|int|string|null>}>}  $payload
+     * @return array{net_worth: float, net_income: float, expenses: float, saving: float, investing: float, guilt_free: float}
+     */
+    private function calculateSnapshotTotals(array $payload): array
+    {
+        $netWorthTotal = 0.0;
+        $netIncome = 0.0;
+
+        foreach ($payload['netWorth'] ?? [] as $entry) {
+            $assetsValue = (float) ($entry['assets'] ?? 0);
+            $investedValue = (float) ($entry['invested'] ?? 0);
+            $savingValue = (float) ($entry['saving'] ?? 0);
+            $debtValue = (float) ($entry['debt'] ?? 0);
+
+            $netWorthTotal += $assetsValue + $investedValue + $savingValue - $debtValue;
+        }
+
+        foreach ($payload['income'] ?? [] as $entry) {
+            $netIncome += (float) ($entry['net'] ?? 0);
+        }
+
+        $expensesSubtotal = $this->sumCategoryValues($payload['expenses'] ?? []);
+        $bufferPercent = (float) ($payload['plan']['buffer_percent'] ?? 0);
+        $expenses = $expensesSubtotal + ($expensesSubtotal * $bufferPercent / 100);
+
+        $investingTotal = $this->sumCategoryValues($payload['investing'] ?? []);
+        $savingTotal = $this->sumCategoryValues($payload['savingGoals'] ?? []);
+
+        $guiltFree = $netIncome - $expenses - $investingTotal - $savingTotal;
+
+        return [
+            'net_worth' => $netWorthTotal,
+            'net_income' => $netIncome,
+            'expenses' => $expenses,
+            'saving' => $savingTotal,
+            'investing' => $investingTotal,
+            'guilt_free' => $guiltFree,
+        ];
+    }
+
+    /**
+     * @param  array<int, array{values?: array<int, float|int|string|null>}>  $categories
+     */
+    private function sumCategoryValues(array $categories): float
+    {
+        $total = 0.0;
+
+        foreach ($categories as $category) {
+            foreach ($category['values'] ?? [] as $value) {
+                $total += (float) $value;
+            }
+        }
+
+        return $total;
     }
 
     /**
