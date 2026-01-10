@@ -22,5 +22,7 @@ class SnapshotSummaryViewTest extends TestCase
         $response->assertSee('Apply filter');
         $response->assertSee('Reset range');
         $response->assertSee(":class=\"trendClass('assets')\"", false);
+        $response->assertSee('Show note', false);
+        $response->assertSee('bg-white px-3 py-1.5 text-xs font-semibold uppercase', false);
     }
 }

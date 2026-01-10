@@ -212,6 +212,91 @@
                 <p class="mt-4 text-sm text-slate-500" x-show="loading">Loading trend data...</p>
             </div>
         </section>
+
+        <section class="rounded-xl border border-slate-200/70 bg-white/80 p-6 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900">All Snapshots</h2>
+                    <p class="text-sm text-slate-500">Browse snapshots 10 at a time.</p>
+                </div>
+                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <span x-text="pagination.total ? `Total ${pagination.total}` : 'Total --'"></span>
+                </div>
+            </div>
+            <div class="mt-6 grid gap-4">
+                <template x-for="snapshot in paginatedSnapshots" :key="snapshot.id">
+                    <div class="rounded-lg border border-slate-200/70 bg-white px-4 py-4 shadow-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-900" x-text="snapshot.name || 'Snapshot'"></p>
+                                <p class="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400" x-text="formatDate(snapshot.captured_at)"></p>
+                            </div>
+                            <button
+                                class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
+                                type="button"
+                                @click="toggleSnapshotNote(snapshot.id)"
+                                :aria-expanded="expandedSnapshotId === snapshot.id"
+                            >
+                                <span x-text="expandedSnapshotId === snapshot.id ? 'Hide note' : 'Show note'"></span>
+                            </button>
+                        </div>
+                        <div class="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-3">
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Net Worth</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.total_net_worth ?? 0)"></span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Income</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.net_income ?? 0)"></span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Expenses</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.total_expenses ?? 0)"></span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Saving</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.total_saving ?? 0)"></span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Investing</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.total_investing ?? 0)"></span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+                                <span class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Guilt-Free</span>
+                                <span class="font-semibold text-slate-900" x-text="formatCurrency(snapshot.guilt_free ?? 0)"></span>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-sm text-slate-600" x-show="expandedSnapshotId === snapshot.id && snapshot.note" x-text="snapshot.note"></div>
+                        <div class="mt-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400" x-show="expandedSnapshotId === snapshot.id && !snapshot.note">
+                            No note for this snapshot.
+                        </div>
+                    </div>
+                </template>
+                <p class="text-sm text-slate-500" x-show="!paginatedSnapshots.length && !paginationLoading">No snapshots yet.</p>
+                <p class="text-sm text-slate-500" x-show="paginationLoading">Loading snapshots...</p>
+            </div>
+            <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+                <button
+                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
+                    type="button"
+                    @click="goToPage(pagination.currentPage - 1)"
+                    :disabled="paginationLoading || pagination.currentPage <= 1"
+                >
+                    Previous
+                </button>
+                <div class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <span x-text="`Page ${pagination.currentPage} of ${pagination.lastPage}`"></span>
+                </div>
+                <button
+                    class="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:text-slate-300"
+                    type="button"
+                    @click="goToPage(pagination.currentPage + 1)"
+                    :disabled="paginationLoading || pagination.currentPage >= pagination.lastPage"
+                >
+                    Next
+                </button>
+            </div>
+        </section>
     </div>
 
 @endsection

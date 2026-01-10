@@ -265,7 +265,9 @@ class SpendingPlanControllerTest extends TestCase
 
         Carbon::setTestNow(Carbon::create(2025, 3, 15, 10, 0, 0));
 
-        $response = $this->postJson(route('plan.snapshots.store'));
+        $response = $this->postJson(route('plan.snapshots.store'), [
+            'note' => 'First month after bonus payout.',
+        ]);
 
         $response->assertCreated();
 
@@ -273,6 +275,7 @@ class SpendingPlanControllerTest extends TestCase
 
         $this->assertNotNull($snapshot);
         $this->assertSame('March 2025', $snapshot->name);
+        $this->assertSame('First month after bonus payout.', $snapshot->note);
         $this->assertNotNull($snapshot->snapshot_plan_id);
 
         $snapshotPlan = Plan::find($snapshot->snapshot_plan_id);
@@ -308,6 +311,25 @@ class SpendingPlanControllerTest extends TestCase
         $this->assertIsNumeric($snapshot['total_saving'] ?? null);
         $this->assertIsNumeric($snapshot['total_investing'] ?? null);
         $this->assertIsNumeric($snapshot['guilt_free'] ?? null);
+    }
+
+    public function test_it_paginates_snapshots_for_the_plan(): void
+    {
+        $this->signIn();
+
+        for ($i = 0; $i < 12; $i++) {
+            $this->postJson(route('plan.snapshots.store'))->assertCreated();
+        }
+
+        $response = $this->getJson(route('plan.snapshots', ['page' => 1, 'per_page' => 10]));
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'snapshots',
+            'meta' => ['current_page', 'last_page', 'total', 'per_page'],
+        ]);
+        $this->assertCount(10, $response->json('snapshots'));
+        $this->assertSame(2, $response->json('meta.last_page'));
     }
 
     public function test_snapshot_summary_uses_stored_totals(): void

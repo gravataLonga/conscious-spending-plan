@@ -13,6 +13,8 @@ window.cspPlan = function () {
         snapshotNotice: '',
         currencyCode: 'USD',
         currencies: [],
+        snapshotModalOpen: false,
+        snapshotNote: '',
         partners: [
             { id: null, name: 'Partner 1' },
             { id: null, name: 'Partner 2' },
@@ -124,6 +126,16 @@ window.cspPlan = function () {
         },
         removeSavingGoal(index) {
             this.savingGoals.splice(index, 1);
+        },
+        openSnapshotModal() {
+            this.snapshotModalOpen = true;
+        },
+        closeSnapshotModal() {
+            this.snapshotModalOpen = false;
+        },
+        async submitSnapshot() {
+            this.snapshotModalOpen = false;
+            await this.createSnapshot();
         },
         toNumber(value) {
             return Number.isFinite(value) ? value : Number.parseFloat(value) || 0;
@@ -384,8 +396,11 @@ window.cspPlan = function () {
             }
 
             try {
-                await window.axios.post('/plan/snapshots');
+                await window.axios.post('/plan/snapshots', {
+                    note: this.snapshotNote.trim() || null,
+                });
                 this.snapshotNotice = 'Snapshot created.';
+                this.snapshotNote = '';
             } catch (error) {
                 console.error(error);
                 this.snapshotNotice = 'Snapshot failed. Try again.';
@@ -412,8 +427,18 @@ window.cspSnapshots = function () {
         resizeObserver: null,
         rangeStart: '',
         rangeEnd: '',
+        paginatedSnapshots: [],
+        pagination: {
+            currentPage: 1,
+            lastPage: 1,
+            total: 0,
+            perPage: 10,
+        },
+        paginationLoading: false,
+        expandedSnapshotId: null,
         init() {
             this.fetchSummary();
+            this.fetchSnapshotPage();
         },
         formatCurrency(value) {
             const formatter = new Intl.NumberFormat('en-US', {
@@ -457,6 +482,36 @@ window.cspSnapshots = function () {
             } finally {
                 this.loading = false;
             }
+        },
+        async fetchSnapshotPage(page = 1) {
+            this.paginationLoading = true;
+            try {
+                const response = await window.axios.get('/plan/snapshots', {
+                    params: {
+                        page,
+                        per_page: this.pagination.perPage,
+                    },
+                });
+
+                this.paginatedSnapshots = response.data.snapshots ?? [];
+                this.pagination = {
+                    currentPage: response.data.meta?.current_page ?? page,
+                    lastPage: response.data.meta?.last_page ?? page,
+                    total: response.data.meta?.total ?? this.paginatedSnapshots.length,
+                    perPage: response.data.meta?.per_page ?? this.pagination.perPage,
+                };
+            } catch (error) {
+                console.error(error);
+            } finally {
+                this.paginationLoading = false;
+            }
+        },
+        goToPage(page) {
+            const target = Math.min(Math.max(page, 1), this.pagination.lastPage || 1);
+            this.fetchSnapshotPage(target);
+        },
+        toggleSnapshotNote(snapshotId) {
+            this.expandedSnapshotId = this.expandedSnapshotId === snapshotId ? null : snapshotId;
         },
         setDefaultRange() {
             if (!this.allSnapshots.length || (this.rangeStart && this.rangeEnd)) {

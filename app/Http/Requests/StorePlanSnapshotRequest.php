@@ -23,6 +23,7 @@ class StorePlanSnapshotRequest extends FormRequest
     {
         return [
             'name' => ['nullable', 'string', 'max:120'],
+            'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

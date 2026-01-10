@@ -21,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SpendingPlanController extends Controller
@@ -263,11 +264,34 @@ class SpendingPlanController extends Controller
         ]);
     }
 
-    public function snapshots()
+    public function snapshots(Request $request)
     {
         $plan = $this->ensurePlan();
 
-        $snapshots = $plan->snapshots()->get()->map(function (PlanSnapshot $snapshot) {
+        $query = $plan->snapshots();
+
+        if ($request->has('page') || $request->boolean('paginate')) {
+            $perPage = (int) $request->input('per_page', 10);
+            $perPage = max(1, min($perPage, 50));
+
+            $paginator = $query->paginate($perPage);
+            $snapshots = $paginator->getCollection()
+                ->map(fn (PlanSnapshot $snapshot) => $this->serializeSnapshot($snapshot))
+                ->values()
+                ->all();
+
+            return response()->json([
+                'snapshots' => $snapshots,
+                'meta' => [
+                    'current_page' => $paginator->currentPage(),
+                    'last_page' => $paginator->lastPage(),
+                    'total' => $paginator->total(),
+                    'per_page' => $paginator->perPage(),
+                ],
+            ]);
+        }
+
+        $snapshots = $query->get()->map(function (PlanSnapshot $snapshot) {
             return $this->serializeSnapshot($snapshot);
         })->values()->all();
 
@@ -302,15 +326,17 @@ class SpendingPlanController extends Controller
     public function storeSnapshot(StorePlanSnapshotRequest $request)
     {
         $plan = $this->ensurePlan();
-        $name = $request->validated()['name'] ?? now()->format('F Y');
+        $validated = $request->validated();
+        $name = $validated['name'] ?? now()->format('F Y');
+        $note = $validated['note'] ?? null;
 
-        $snapshot = DB::transaction(function () use ($plan, $name) {
+        $snapshot = DB::transaction(function () use ($plan, $name, $note) {
             $payload = $this->serializePlan($plan);
             $totals = $this->calculateSnapshotTotals($payload);
 
             $snapshotPlan = $this->clonePlanForSnapshot($plan);
 
-            return $plan->snapshots()->create([
+            $snapshotPayload = [
                 'name' => $name,
                 'captured_at' => now(),
                 'snapshot_plan_id' => $snapshotPlan->id,
@@ -321,7 +347,13 @@ class SpendingPlanController extends Controller
                 'total_investing' => $totals['investing'],
                 'guilt_free' => $totals['guilt_free'],
                 'payload' => [],
-            ]);
+            ];
+
+            if (Schema::hasColumn('plan_snapshots', 'note')) {
+                $snapshotPayload['note'] = $note;
+            }
+
+            return $plan->snapshots()->create($snapshotPayload);
         });
 
         return response()->json([
@@ -560,6 +592,7 @@ class SpendingPlanController extends Controller
         return [
             'id' => $snapshot->id,
             'name' => $snapshot->name,
+            'note' => $snapshot->note,
             'captured_at' => optional($snapshot->captured_at)->toIso8601String(),
             'total_net_worth' => $snapshot->total_net_worth !== null ? (float) $snapshot->total_net_worth : null,
             'net_income' => $snapshot->net_income !== null ? (float) $snapshot->net_income : null,

@@ -11,6 +11,7 @@ class PlanSnapshot extends Model
         'plan_id',
         'snapshot_plan_id',
         'name',
+        'note',
         'captured_at',
         'total_net_worth',
         'net_income',
